@@ -1,0 +1,1068 @@
+LINE ADDR CONTENTS SOURCE LINE
+  1.              	;CONSTANT
+  2.              	.equ NO_OP, 0
+  3.              	.equ PAUSE_DELAY, 0
+  4.              	.equ EXTRA_LIFE, 10
+  5.              	.equ REPLAY_COUNT, 4
+  6.              	.equ Q_SIZE, 600
+  7.              	.equ DIR_UP, 3
+  8.              	.equ DIR_DOWN, 2
+  9.              	.equ DIR_RIGHT, 5
+ 10.              	.equ DIR_LEFT, 4
+ 11.              	.equ UP_ARROW,'H'
+ 12.              	.equ DOWN_ARROW,'P'
+ 13.              	.equ RIGHT_ARROW,'M'
+ 14.              	.equ LEFT_ARROW, 'K'
+ 15.              	.equ BODY, 'O'	
+ 16.              	.equ FOOD, 'F'
+ 17.              	.equ WAIT_DELAY, 2
+ 18.              	.equ KBD_CNTL, $000
+ 19.              	.equ KBD_STAT, $000
+ 20.              	.equ KBD_DATA, $001
+ 21.              	.equ KBD_FLUSH, $40
+ 22.              	.equ TIM_CNTL, $030
+ 23.              	.equ TIM_STAT, $030
+ 24.              	.equ TIM_RELOAD, $031
+ 25.              	.equ TIM_COUNT, $034
+ 26.              	.equ INTERRUPT_ENA, $80
+ 27.              	.equ RESET_READY_BIT, $40
+ 28.              	.equ START_AFTER_LOAD, $10
+ 29.              	.equ ENABLE_RESET_AND_START, $D0
+ 30.              	.equ ENABLE_AND_RESET, $C0
+ 31.              	.equ CRT_BUFFER, $100
+ 32.              	.equ BOTTOM_RIGHT, $313
+ 33.              	.equ CRT_XREG, $314
+ 34.              	.equ CRT_YREG, $315
+ 35.              	.equ CRT_CNTL, $316
+ 36.              	.equ CRT_DATA, $317
+ 37.              	.equ CRT_ROWS, $0E
+ 38.              	.equ CRT_COLS, $26
+ 39.              	.equ CLEAR_DISPLAY, $01
+ 40.              	.equ HOME, $04
+ 41.              	.equ PUT_NUM, $E00
+ 42.              	.equ GET_NUM, $E01
+ 43.              	.equ PUT_STR, $E05
+ 44.              	.equ PUT_NL, $E06
+ 45.              	.equ PUT_NUM2, $E07
+ 46.              	.equ PUT_CHR, $E08
+ 47.              	.equ CLEAR_SCREEN, $01
+ 48.              	.equ ENTER_KEY, $0D
+ 49.              	.equ PLAY_DELAY, 1
+ 50.              	;END CONSTANT
+ 51.  000 020E00  	LDS# $E00
+ 52.  001 0A22A1  	clr score
+ 53.  002 010003  	ldx# 3
+ 54.  003 0522A9  	stx live
+ 55.  004 000001  	lda# 1
+ 56.  005 0422A0  	sta speed
+ 57.  006 0A229F  	clr SEED
+ 58.              	;PASS DELAY REMINDER
+ 59.  007 412109  	jsr startgame; display game screen
+ 60.  008 FFF033  	CIE
+ 61.  009 000016  	LDA# KEYISR 
+ 62.  00A 042FF8  	STA $FF8
+ 63.  00B 0000C0  	LDA# ENABLE_AND_RESET 
+ 64.  00C 712000  	OUTB KBD_CNTL
+ 65.  00D 000001  	LDA# 1
+ 66.  00E 732031  	OUTW TIM_RELOAD
+ 67.  00F 000151  	LDA# TIMERISR
+ 68.  010 042FFB  	STA $FFB ; SET-UP TIMER ISR
+ 69.  011 0000D0  	lda# ENABLE_RESET_AND_START
+ 70.  012 712030  	outb TIM_CNTL
+ 71.  013 FFF032  	SIE
+ 72.  014 FFF038  MAINLOOP:	NOP
+ 73.  015 402014  	JMP MAINLOOP
+ 74.              
+ 75.              	
+ 76.              
+ 77.              ;KEYBOARD CONTROL
+ 78.  016 FFF010  KEYISR:	PSHA 
+ 79.  017 000000  	lda# 0
+ 80.  018 712000  	outb KBD_CNTL
+ 81.  019 702001  	INB KBD_DATA
+ 82.  01A 200078  	CMA# 'x'
+ 83.  01B 49201D  	JNE KEY_SWITCH
+ 84.  01C FFFFFF  	HLT
+ 85.  01D 200020  KEY_SWITCH:	cma# ' '
+ 86.  01E 482041  	jeq space_key
+ 87.  01F 702001  	inb KBD_DATA
+ 88.  020 200048  	cma# UP_ARROW
+ 89.  021 482029  	jeq up_key
+ 90.  022 200050  	cma# DOWN_ARROW
+ 91.  023 48202F  	jeq down_key
+ 92.  024 20004B  	cma# LEFT_ARROW
+ 93.  025 482035  	jeq left_key
+ 94.  026 20004D  	cma# RIGHT_ARROW
+ 95.  027 48203B  	jeq right_key
+ 96.  028 40204E  	jmp Keydone
+ 97.  029 0022A7  up_key:	lda direction
+ 98.  02A 200002  	cma# DIR_DOWN
+ 99.  02B 48204E  	jeq Keydone
+100.  02C 000003  	lda# DIR_UP
+101.  02D 0422A7  	sta direction
+102.  02E 40204E  	jmp Keydone
+103.  02F 0022A7  down_key:	lda direction
+104.  030 200003  	cma# DIR_UP
+105.  031 48204E  	jeq Keydone
+106.  032 000002  	lda# DIR_DOWN
+107.  033 0422A7  	sta direction
+108.  034 40204E  	jmp Keydone
+109.  035 0022A7  left_key:	lda direction
+110.  036 200005  	cma# DIR_RIGHT
+111.  037 48204E  	jeq Keydone
+112.  038 000004  	lda# DIR_LEFT
+113.  039 0422A7  	sta direction
+114.  03A 40204E  	jmp Keydone
+115.  03B 0022A7  right_key:	lda direction
+116.  03C 200004  	cma# DIR_LEFT
+117.  03D 48204E  	jeq Keydone
+118.  03E 000005  	lda# DIR_RIGHT
+119.  03F 0422A7  	sta direction
+120.  040 40204E  	jmp Keydone
+121.  041 0022A3  space_key:	lda delay
+122.  042 200000  	cma# PAUSE_DELAY
+123.  043 482049  	jeq un_pause
+124.  044 000000  	lda# PAUSE_DELAY
+125.  045 0422A3  	sta delay
+126.  046 000080  	lda# INTERRUPT_ENA
+127.  047 712000  	outb KBD_CNTL
+128.  048 40204E  	jmp Keydone
+129.  049 000001  un_pause:	lda# PLAY_DELAY
+130.  04A 0422A3  	sta delay
+131.  04B 000080  	lda# INTERRUPT_ENA
+132.  04C 712000  	outb KBD_CNTL
+133.  04D 40204E  	jmp Keydone
+134.              Keydone:	;lda# INTERRUPT_ENA
+135.              	;outb KBD_CNTL	
+136.              	;lda# KBD_FLUSH
+137.              	;outb KBD_CNTL
+138.  04E FFF013  	popa
+139.  04F FFF041  	IRTN
+140.              	
+141.              
+142.              ;END OF KEYBOARD
+143.              .equ sbody_char, 14
+144.              .equ ssecond, 13
+145.              .equ sdirection, 12
+146.              .equ shead, 11
+147.              .equ stail, 10
+148.              .equ sQ, 9
+149.              .equ sdelay, 8
+150.              .equ sx, 5
+151.              .equ sy, 4
+152.              .equ sloc, 3
+153.              .equ sx2, 2
+154.              .equ sy2, 1
+155.              .equ si, 0
+156.  050 680006  start_snake:	bgn# 6
+157.  051 FFF010  	psha
+158.  052 FFF011  	pshx
+159.  053 000001  	lda# CLEAR_SCREEN
+160.  054 712316  	outb CRT_CNTL
+161.  055 000001  	lda# 1;change lnegth
+162.  056 043000  	sta !si
+163.  057 080003  	psh# 3
+164.  058 4120FF  	jsr random
+165.  059 120001  	ads# 1
+166.  05A 100002  	ada# DIR_DOWN
+167.  05B 04700C  	sta* !sdirection
+168.  05C 200003  	cma# DIR_UP
+169.  05D 482064  	jeq sup
+170.  05E 200002  	cma# DIR_DOWN
+171.  05F 482067  	jeq sdown
+172.  060 200005  	cma# DIR_RIGHT
+173.  061 48206A  	jeq sright
+174.  062 200004  	cma# DIR_LEFT
+175.  063 48206D  	jeq sleft
+176.  064 00005E  sup:	lda# '^'
+177.  065 04300E  	sta !sbody_char
+178.  066 402070  	jmp sdone
+179.  067 000076  sdown:	lda# 'v'
+180.  068 04300E  	sta !sbody_char
+181.  069 402070  	jmp sdone
+182.  06A 00003E  sright:	lda# '>'
+183.  06B 04300E  	sta !sbody_char
+184.  06C 402070  	jmp sdone
+185.  06D 00003C  sleft:	lda# '<'
+186.  06E 04300E  	sta !sbody_char
+187.  06F 402070  	jmp sdone
+188.              sdone:
+189.  070 08001C  	psh# 28
+190.  071 4120FF  	jsr random
+191.  072 120001  	ads# 1
+192.  073 100005  	ada# 5
+193.  074 043005  	sta !sx ;so it start 5 from wall
+194.  075 080004  	psh# 4
+195.  076 4120FF  	jsr random
+196.  077 120001  	ads# 1
+197.  078 100005  	ada# 5
+198.              	;sba# 1;added
+199.  079 043004  	sta !sy ;so it start 5 from wall
+200.  07A 003004  	lda !sy
+201.  07B 180026  	mul# 38
+202.  07C 103005  	ada !sx
+203.  07D 043003  	sta !sloc
+204.  07E 08300E  	psh !sbody_char
+205.  07F 083005  	psh !sx
+206.  080 083004  	psh !sy
+207.  081 412277  	jsr Put_char
+208.  082 120003  	ads# 3
+209.  083 000002  	lda# 2;change length
+210.  084 04700B  	sta* !shead
+211.  085 000000  	lda# 0
+212.  086 04700A  	sta* !stail
+213.  087 010002  	ldx# 2;change length
+214.  088 003003  	lda !sloc
+215.  089 049009  	sta& !sQ 
+216.  08A 003000  for_Q:	lda !si
+217.  08B 200000  	cma# 0
+218.  08C 4A20C2  	jlt set_food_q
+219.  08D FFF000  	tax
+220.  08E 00700C  	lda* !sdirection
+221.  08F 200003  	cma# DIR_UP
+222.  090 482097  	jeq case_up
+223.  091 200002  	cma# DIR_DOWN
+224.  092 48209F  	jeq case_down
+225.  093 200004  	cma# DIR_LEFT
+226.  094 4820AF  	jeq case_left
+227.  095 200005  	cma# DIR_RIGHT
+228.  096 4820A7  	jeq case_right
+229.  097 00005E  case_up:	lda# '^'
+230.  098 04300E  	sta !sbody_char
+231.  099 110001  	adx# 1
+232.  09A 009009  	lda& !sQ
+233.  09B 100026  	ada# 38
+234.  09C 150001  	sbx# 1
+235.  09D 049009  	sta& !sQ
+236.  09E 4020B7  	jmp compare_si
+237.  09F 000076  case_down:	lda# 'v'
+238.  0A0 04300E  	sta !sbody_char
+239.  0A1 110001  	adx# 1
+240.  0A2 009009  	lda& !sQ
+241.  0A3 140026  	sba# 38
+242.  0A4 150001  	sbx# 1
+243.  0A5 049009  	sta& !sQ
+244.  0A6 4020B7  	jmp compare_si
+245.  0A7 00003E  case_right:	lda# '>'
+246.  0A8 04300E  	sta !sbody_char
+247.  0A9 110001  	adx# 1
+248.  0AA 009009  	lda& !sQ
+249.  0AB 140001  	sba# 1
+250.  0AC 150001  	sbx# 1
+251.  0AD 049009  	sta& !sQ
+252.  0AE 4020B7  	jmp compare_si
+253.  0AF 00003C  case_left:	lda# '<'
+254.  0B0 04300E  	sta !sbody_char
+255.  0B1 110001  	adx# 1
+256.  0B2 009009  	lda& !sQ
+257.  0B3 100001  	ada# 1
+258.  0B4 150001  	sbx# 1
+259.  0B5 049009  	sta& !sQ
+260.  0B6 4020B7  	jmp compare_si
+261.  0B7 08300E  compare_si:	psh !sbody_char
+262.  0B8 009009  	lda& !sQ
+263.  0B9 1A0026  	mod# 38
+264.  0BA FFF010  	psha
+265.  0BB 009009  	lda& !sQ
+266.  0BC 190026  	div# 38
+267.  0BD FFF010  	psha
+268.  0BE 412277  	jsr Put_char
+269.  0BF 120003  	ads# 3
+270.  0C0 1C3000  	dec !si
+271.  0C1 40208A  	jmp for_Q
+272.  0C2 000000  set_food_q:	lda# 0
+273.  0C3 043000  	sta !si
+274.  0C4 003000  for_food_q:	lda !si
+275.  0C5 200005  	cma# 5;HERE
+276.  0C6 4B20F6  	jge end_start
+277.  0C7 080025  X2_loop:	psh# 37
+278.  0C8 4120FF  	jsr random
+279.  0C9 120001  	ads# 1
+280.  0CA 100001  	ada# 1
+281.  0CB 043002  	sta !sx2
+282.  0CC 143005  	sba !sx
+283.  0CD FFF010  	psha
+284.  0CE 412286  	jsr abs
+285.  0CF 120001  	ads# 1
+286.  0D0 200005  	cma# 5
+287.  0D1 4A20C7  	jlt X2_loop
+288.  0D2 08000C  Y2_loop:	psh# 12
+289.  0D3 4120FF  	jsr random
+290.  0D4 120001  	ads# 1
+291.  0D5 100001  	ada# 1
+292.              	;sba# 1;added
+293.  0D6 043001  	sta !sy2
+294.  0D7 143004  	sba !sy
+295.  0D8 FFF010  	psha
+296.  0D9 412286  	jsr abs
+297.  0DA 120001  	ads# 1
+298.  0DB 200005  	cma# 5
+299.  0DC 4A20D2  	jlt Y2_loop
+300.              end_do_whiles:
+301.              	;lda !sy2
+302.              	;outb CRT_YREG
+303.              	;lda !sx2
+304.              	;outb CRT_XREG
+305.              	;inb CRT_DATA
+306.  0DD 003001  	lda !sy2
+307.  0DE 140001  	sba# 1
+308.  0DF 180026  	mul# 38
+309.  0E0 103002  	ada !sx2
+310.              	;sba# 1
+311.  0E1 FFF000  	tax
+312.  0E2 704100  	inb+ CRT_BUFFER
+313.  0E3 200046  	cma# 'F'
+314.  0E4 4820F3  	jeq start_else
+315.  0E5 20005E  	cma# '^';WRONG DOES NOT REALLY CHECK FIXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+316.  0E6 4820F3  	jeq start_else
+317.  0E7 200076  	cma# 'v'
+318.  0E8 4820F3  	jeq start_else
+319.  0E9 20003E  	cma# '>'
+320.  0EA 4820F3  	jeq start_else
+321.  0EB 20003C  	cma# '<'
+322.  0EC 4820F3  	jeq start_else
+323.  0ED 080046  	psh# FOOD
+324.  0EE 083002  	psh !sx2
+325.  0EF 083001  	psh !sy2
+326.  0F0 412277  	jsr Put_char
+327.  0F1 120003  	ads# 3
+328.  0F2 4020F4  	jmp cmp_food_for
+329.  0F3 1C3000  start_else:	dec !si
+330.  0F4 1B3000  cmp_food_for:	inc !si
+331.  0F5 4020C4  	jmp for_food_q
+332.              	
+333.  0F6 00700D  end_start:	lda* !ssecond
+334.  0F7 1407D0  	sba# 2000
+335.              	;sba# 4000
+336.              	;mul SPEED
+337.  0F8 732031  	outw TIM_RELOAD
+338.              	;sta* !ssecond
+339.  0F9 000001  	lda# PLAY_DELAY
+340.  0FA 047008  	sta* !sdelay
+341.  0FB FFF014  	popx
+342.  0FC FFF013  	popa
+343.  0FD 690006  	fin#6
+344.  0FE FFF040  	rtn
+345.              	
+346.              	.equ randomMax, 2
+347.  0FF 680000  random: 	bgn# 0 
+348.  100 00229F  	lda SEED
+349.  101 180ADB  	mul# 2779
+350.  102 1007CD  	ada# 1997
+351.  103 1A0800  	mod# 2048
+352.  104 04229F  	sta SEED
+353.  105 1B3002  	inc ! randomMax
+354.  106 1A3002  	mod ! randomMax
+355.  107 690000  	fin# 0
+356.  108 FFF040  	rtn
+357.              ;DISPLAY THE MENU OF THE PROGRAM
+358.  109 680000  startgame:	bgn# 0
+359.              	;psh# SPEED_STR_LEN
+360.              	;psh# speed_str
+361.              	;jsr PUT_STR
+362.              	;jsr GET_NUM
+363.              	;sta speed
+364.              	;ads# 2
+365.  10A 080004  	psh# SEED_STR_LEN
+366.  10B 0802BB  	psh# seed_str
+367.  10C 412E05  	jsr PUT_STR
+368.  10D 412E01  	jsr GET_NUM
+369.  10E 04229F  	sta SEED
+370.  10F 120002  	ads# 2
+371.  110 000001  	lda# CLEAR_SCREEN
+372.  111 712316  	outb CRT_CNTL
+373.  112 080012  	psh# INTRO1_LEN
+374.  113 0802BD  	psh# intro1
+375.  114 412E05  	jsr PUT_STR
+376.  115 120002  	ads# 2
+377.  116 412E06  	jsr PUT_NL
+378.  117 412E06  	jsr PUT_NL
+379.  118 08001C  	psh# INTRO2_LEN
+380.  119 0802C3  	psh# intro2
+381.  11A 412E05  	jsr PUT_STR
+382.  11B 412E06  	jsr PUT_NL
+383.  11C 120002  	ads# 2
+384.  11D 08001F  	psh# INTRO3_len
+385.  11E 0802CD  	psh# intro3
+386.  11F 412E05  	jsr PUT_STR
+387.  120 412E06  	jsr PUT_NL
+388.  121 120002  	ads# 2
+389.  122 08001E  	psh# INTRO4_LEN
+390.  123 0802D8  	psh# intro4
+391.  124 412E05  	jsr PUT_STR
+392.  125 412E06  	jsr PUT_NL
+393.  126 120002  	ads# 2
+394.  127 080023  	psh# INTRO5_LEN
+395.  128 0802E2  	psh# intro5
+396.  129 412E05  	jsr PUT_STR
+397.  12A 412E06  	jsr PUT_NL
+398.  12B 120002  	ads# 2
+399.  12C 08001B  	psh# INTRO6_LEN
+400.  12D 0802EE  	psh# intro6
+401.  12E 412E05  	jsr PUT_STR
+402.  12F 412E06  	jsr PUT_NL
+403.  130 120002  	ads# 2
+404.  131 080025  	psh# INTRO7_LEN
+405.  132 0802F7  	psh# intro7
+406.  133 412E05  	jsr PUT_STR
+407.  134 412E06  	jsr PUT_NL
+408.  135 120002  	ads# 2
+409.  136 080023  	psh# INTRO8_LEN
+410.  137 080304  	psh# intro8
+411.  138 412E05  	jsr PUT_STR
+412.  139 412E06  	jsr PUT_NL
+413.  13A 120002  	ads# 2
+414.  13B 080022  	psh# INTRO9_LEN
+415.  13C 080310  	psh# intro9
+416.  13D 412E05  	jsr PUT_STR
+417.  13E 412E06  	jsr PUT_NL
+418.  13F 120002  	ads# 2
+419.  140 080021  	psh# INTRO0_LEN
+420.  141 08031C  	psh# intro0
+421.  142 412E05  	jsr PUT_STR
+422.  143 412E06  	jsr PUT_NL
+423.  144 120002  	ads# 2
+424.  145 702000  enter_wait:	inb KBD_STAT
+425.  146 4B2145  	jge enter_wait
+426.  147 702001  	inb KBD_DATA
+427.  148 20000D  	cma# ENTER_KEY
+428.  149 48214B  	jeq stop_enter
+429.  14A 402145  	jmp enter_wait
+430.  14B 000001  stop_enter:	lda# CLEAR_SCREEN
+431.  14C 712316  	outb CRT_CNTL
+432.  14D 000002  	lda# WAIT_DELAY
+433.  14E 0422A3  	sta delay	
+434.  14F 690000  	fin# 0
+435.  150 FFF040  	rtn
+436.              ;END OF MENU
+437.              	.equ option , 2
+438.  151 FFF010  TIMERISR:	PSHA
+439.  152 0022A3  	lda DELAY
+440.  153 200000  	cma# NO_OP
+441.  154 482192  	jeq TIMER_DONE
+442.  155 200001  	cma# PLAY_DELAY
+443.  156 482177  	jeq move
+444.  157 200002  	cma# WAIT_DELAY
+445.  158 48215B  	jeq waiting
+446.  159 200004  	cma# REPLAY_COUNT
+447.  15A 482187  	jeq back_wait
+448.  15B 08229E  waiting:	psh second
+449.  15C 41228D  	jsr set_second
+450.  15D 120001  	ads# 1
+451.  15E 712316  	outb CRT_CNTL
+452.  15F 000007  	lda# 7
+453.  160 712315  	outb CRT_YREG
+454.  161 000013  	lda# 19
+455.  162 712314  	outb CRT_XREG
+456.  163 FFF003  	txa
+457.  164 100030  	ada# 48
+458.  165 712317  	outb CRT_DATA
+459.  166 00000F  	lda# 15
+460.  167 712315  	outb CRT_YREG
+461.  168 000028  	lda# 40
+462.  169 712314  	outb CRT_XREG
+463.  16A 150001  	sbx# 1
+464.  16B 210FFF  	cmx# $FFF
+465.  16C 492176  	jne done_wait
+466.              	;clr score ; set score to zero and start snake
+467.  16D 0822A6  start_tim_s:	psh body_char
+468.  16E 08029E  	psh# second
+469.  16F 0802A7  	psh# direction
+470.  170 0802A8  	psh# head
+471.  171 0802AA  	psh# tail
+472.  172 080A00  	psh# Q
+473.  173 0802A3  	psh# DELAY
+474.  174 412050  	jsr start_snake
+475.  175 120007  	ads# 7
+476.  176 402192  done_wait:	jmp TIMER_DONE
+477.  177 000080  move:	lda# INTERRUPT_ENA
+478.  178 712000  	outb KBD_CNTL	
+479.  179 0822A6  	psh body_char
+480.  17A 0802A3  	psh# delay
+481.  17B 0802A9  	psh# live
+482.  17C 0802A8  	psh# head
+483.  17D 0802AA  	psh# tail
+484.  17E 0822A7  	psh direction
+485.  17F 080A00  	psh# Q
+486.  180 0802A1  	psh# score
+487.  181 412196  	jsr move_snake	
+488.  182 120008  	ads# 8
+489.  183 08029E  	psh# second
+490.  184 412294  	jsr reduce_time
+491.  185 120001  	ads# 1
+492.  186 402192  	jmp TIMER_DONE
+493.  187 08229E  back_wait:	psh second
+494.  188 41228D  	jsr set_second
+495.  189 120001  	ads# 1
+496.  18A 150001  	sbx# 1
+497.  18B 210FFF  	cmx# $FFF
+498.  18C 492176  	jne done_wait
+499.  18D 010003  	ldx# 3
+500.  18E 000002  	lda# WAIT_DELAY
+501.  18F 0422A3  	sta delay
+502.  190 000001  	lda# clear_screen
+503.  191 712316  	outb CRT_CNTL
+504.  192 0000C0  TIMER_DONE:	lda# ENABLE_AND_RESET
+505.  193 712030  	outb TIM_CNTL
+506.  194 FFF013  	popa
+507.  195 FFF041  	IRTN
+508.              
+509.              ;MOVE SNAKE
+510.              .equ mbody_char, 13
+511.              .equ mdelay, 12
+512.              .equ mlive, 11
+513.              .equ mhead, 10
+514.              .equ mtail, 9
+515.              .equ mdirection, 8
+516.              .equ mQ, 7
+517.              .equ mscore, 6
+518.              .equ mloc, 4
+519.              .equ mx, 3
+520.              .equ my, 2
+521.              .equ mcheck, 1
+522.              .equ mfood_flag, 0
+523.  196 680004  move_snake:	bgn# 4
+524.              	;lda# INTERRUPT_ENA
+525.              	;outb KBD_CNTL	
+526.  197 00700A  	lda* !mhead
+527.  198 FFF000  	tax
+528.  199 009007  	lda& !mQ
+529.  19A 043004  	sta !mloc
+530.  19B 003008  	lda !mdirection
+531.  19C 200003  	cma# DIR_UP
+532.  19D 4821A4  	jeq mcase_up
+533.  19E 200002  	cma# DIR_DOWN
+534.  19F 4821B3  	jeq mcase_down
+535.  1A0 200004  	cma# DIR_LEFT
+536.  1A1 4821C2  	jeq mcase_left
+537.  1A2 200005  	cma# DIR_RIGHT
+538.  1A3 4821D4  	jeq mcase_right
+539.  1A4 00005E  mcase_up:	lda# '^'
+540.  1A5 04300D  	sta !mbody_char
+541.  1A6 003004  	lda !mloc
+542.  1A7 140026  	sba# 38
+543.  1A8 043004  	sta !mloc
+544.  1A9 003004  	lda !mloc
+545.  1AA 200026  	cma# 38
+546.  1AB 4B21B0  	jge uset_1
+547.              	;lda# 0
+548.  1AC 100214  	ada# 532
+549.  1AD 043004  	sta !mloc
+550.  1AE 043001  	sta !mcheck
+551.  1AF 4021E6  	jmp mcase_done
+552.  1B0 000001  uset_1:	lda# 1
+553.  1B1 043001  	sta !mcheck
+554.  1B2 4021E6  	jmp mcase_done
+555.  1B3 000076  mcase_down:	lda# 'v'
+556.  1B4 04300D  	sta !mbody_char
+557.  1B5 003004  	lda !mloc
+558.  1B6 100026  	ada# 38
+559.  1B7 043004  	sta !mloc
+560.  1B8 003004  	lda !mloc
+561.  1B9 200239  	cma# 569
+562.  1BA 4C21BF  	jle dset_1
+563.              	;lda# 0
+564.  1BB 140214  	sba# 532
+565.  1BC 043004  	sta !mloc
+566.  1BD 043001  	sta !mcheck
+567.  1BE 4021E6  	jmp mcase_done
+568.  1BF 000001  dset_1:	lda# 1
+569.  1C0 043001  	sta !mcheck
+570.  1C1 4021E6  	jmp mcase_done
+571.  1C2 00003C  mcase_left:	lda# '<'
+572.  1C3 04300D  	sta !mbody_char
+573.  1C4 003004  	lda !mloc
+574.  1C5 140001  	sba# 1
+575.  1C6 043004  	sta !mloc
+576.  1C7 003004  	lda !mloc
+577.  1C8 100001  	ada# 1
+578.  1C9 1A0026  	mod# 38
+579.  1CA 200000  	cma# 0
+580.  1CB 4921D1  	jne lset_1
+581.  1CC 003004  	lda !mloc
+582.  1CD 100026  	ada# 38
+583.  1CE 043004  	sta !mloc
+584.  1CF 043001  	sta !mcheck
+585.  1D0 4021E6  	jmp mcase_done
+586.  1D1 000001  lset_1:	lda# 1
+587.  1D2 043001  	sta !mcheck
+588.  1D3 4021E6  	jmp mcase_done
+589.  1D4 00003E  mcase_right:	lda# '>'
+590.  1D5 04300D  	sta !mbody_char
+591.  1D6 003004  	lda !mloc
+592.  1D7 100001  	ada# 1
+593.  1D8 043004  	sta !mloc
+594.  1D9 003004  	lda !mloc
+595.  1DA 140001  	sba# 1
+596.  1DB 1A0026  	mod# 38
+597.  1DC 200025  	cma# 37
+598.  1DD 4921E3  	jne rset_1
+599.  1DE 003004  	lda !mloc
+600.  1DF 140026  	sba# 38
+601.  1E0 043004  	sta !mloc
+602.              	;lda# 1
+603.  1E1 043001  	sta !mcheck
+604.  1E2 4021E6  	jmp mcase_done
+605.  1E3 000001  rset_1:	lda# 1
+606.  1E4 043001  	sta !mcheck
+607.  1E5 4021E6  	jmp mcase_done
+608.  1E6 003001  mcase_done:	lda !mcheck
+609.              	;cma# 0
+610.              	;jeq snake_die
+611.  1E7 003004  do:	lda !mloc
+612.  1E8 1A0026  	mod# 38
+613.              	;cma# 0
+614.              	;jne set_mx
+615.              	;lda# 38
+616.  1E9 043003  set_mx:	sta !mx
+617.  1EA 003004  	lda !mloc
+618.  1EB 190026  	div# 38
+619.  1EC 043002  	sta !my
+620.  1ED 003004  	lda !mloc
+621.  1EE FFF000  	tax
+622.  1EF 150026  	sbx# 38
+623.              	;sbx# 1
+624.  1F0 704100  	inb+ CRT_BUFFER
+625.              	;cma# BODY
+626.  1F1 20005E  	cma# '^'
+627.  1F2 4821FA  	jeq yes_body
+628.  1F3 200076  	cma# 'v'
+629.  1F4 4821FA  	jeq yes_body
+630.  1F5 20003E  	cma# '>'
+631.  1F6 4821FA  	jeq yes_body
+632.  1F7 20003C  	cma# '<'
+633.  1F8 4821FA  	jeq yes_body
+634.  1F9 4021FD  	jmp no_body
+635.  1FA 000000  yes_body:	lda# 0
+636.  1FB 043001  	sta !mcheck
+637.  1FC 40224B  	jmp snake_die
+638.  1FD 200046  no_body:	cma# FOOD
+639.  1FE 482202  	jeq set_food_1
+640.  1FF 000000  	lda# 0
+641.  200 043000  	sta !mfood_flag
+642.  201 402204  	jmp after_set_f
+643.  202 000001  set_food_1:	lda# 1
+644.  203 043000  	sta !mfood_flag
+645.  204 08300D  after_set_f:	psh !mbody_char
+646.  205 083003  	psh !mx
+647.  206 083002  	psh !my
+648.  207 412277  	jsr Put_char
+649.  208 120003  	ads# 3
+650.  209 1B700A  	inc* !mhead
+651.  20A 00700A  	lda* !mhead
+652.  20B 200258  	cma# Q_SIZE
+653.  20C 4A220E  	jlt Q_OK
+654.  20D 0A700A  	clr* !mhead
+655.  20E 00700A  Q_OK:	lda* !mhead
+656.  20F FFF000  	tax
+657.  210 003004  	lda !mloc
+658.  211 049007  	sta& !mQ
+659.  212 003000  	lda !mfood_flag
+660.  213 200000  	cma# 0
+661.  214 482236  	jeq else_food_flag
+662.  215 1B7006  	inc* !mscore
+663.              ;ADD LIFE
+664.  216 007006  	lda* !mscore
+665.  217 1A000A  	mod# EXTRA_LIFE
+666.  218 200000  	cma# 0
+667.  219 49221B  	jne do_while
+668.  21A 1B700B  	inc* !mlive
+669.              do_while:	;psh# 37
+670.              	;jsr random
+671.              	;ads# 1
+672.              	;sta !mx
+673.              	;psh# 13
+674.              	;jsr random
+675.              	;ads# 1
+676.              	;sta !my
+677.              	;lda !my
+678.              	;mul# 38
+679.              	;ada !mx
+680.  21B 080213  	psh# 531
+681.  21C 4120FF  	jsr random
+682.  21D 120001  	ads# 1
+683.  21E FFF000  	tax
+684.  21F 190026  	div# 38
+685.  220 100001  	ada# 1
+686.  221 043002  	sta !my
+687.  222 FFF003  	txa
+688.  223 1A0026  	mod# 38
+689.  224 043003  	sta !mx
+690.              	;sbx# 39
+691.  225 704100  	inb+ CRT_BUFFER
+692.  226 20005E  	cma# '^'
+693.  227 48221B  	jeq do_while
+694.  228 20003E  	cma# '>'
+695.  229 48221B  	jeq do_while
+696.  22A 20003C  	cma# '<'
+697.  22B 48221B  	jeq do_while
+698.  22C 200076  	cma# 'v'
+699.  22D 48221B  	jeq do_while
+700.  22E 200046  	cma# FOOD
+701.  22F 48221B  	jeq do_while
+702.              ;END DO WHILE
+703.  230 080046  	psh# FOOD
+704.  231 083003  	psh !mx
+705.  232 083002  	psh !my
+706.  233 412277  	jsr Put_char
+707.  234 120003  	ads# 3
+708.  235 402274  	jmp end_move
+709.              else_food_flag:
+710.  236 007009  	lda* !mtail
+711.  237 FFF000  	tax
+712.  238 009007  	lda& !mQ
+713.  239 1A0026  	mod# 38
+714.              	;cma# 0
+715.              	;jne set_mx2
+716.              	;lda# 38
+717.  23A 043003  set_mx2:	sta !mx
+718.  23B 007009  	lda* !mtail
+719.  23C FFF000  	tax
+720.  23D 009007  	lda& !mQ
+721.  23E 190026  	div# 38
+722.  23F 043002  	sta !my
+723.  240 080020  	psh# ' '
+724.  241 083003  	psh !mx
+725.  242 083002  	psh !my
+726.  243 412277  	jsr Put_char
+727.  244 120003  	ads# 3
+728.  245 1B7009  	inc* !mtail
+729.  246 007009  	lda* !mtail
+730.  247 200258  	cma# Q_size
+731.  248 4A2274  	jlt end_move
+732.  249 0A7009  	clr* !mtail
+733.  24A 402274  	jmp end_move
+734.              no_reset_tail:	
+735.  24B 1C700B  snake_die:	dec* !mlive	
+736.  24C 000001  	lda# 1
+737.  24D 712314  	outb CRT_XREG
+738.  24E 712315  	outb CRT_YREG
+739.  24F 080017  	psh# SCORE_PRINT_LEN
+740.  250 080327  	psh# SCORE_PRINT
+741.  251 412E05  	jsr PUT_STR
+742.  252 120002  	ads# 2
+743.  253 007006  	lda* !mscore
+744.  254 412E07  	jsr PUT_NUM2
+745.  255 000002  	lda# 2
+746.  256 712315  	outb CRT_YREG
+747.  257 000001  	lda# 1
+748.  258 712314  	outb CRT_XREG
+749.  259 080017  	psh# LIVE_PRINT_LEN
+750.  25A 08032F  	psh# LIVE_PRINT
+751.  25B 412E05  	jsr PUT_STR
+752.  25C 120002  	ads# 2
+753.  25D 00700B  	lda* !mlive
+754.  25E 412E07  	jsr PUT_NUM2
+755.  25F 00700B  	lda* !mlive
+756.  260 200000  	cma# 0
+757.  261 492271  	jne replay
+758.  262 000003  	lda# 3
+759.  263 712315  	outb CRT_YREG
+760.  264 000001  	lda# 1
+761.  265 712314  	outb CRT_XREG
+762.  266 080019  	psh# GAME_OVER_P_LEN
+763.  267 080337  	psh# GAME_OVER_P
+764.  268 412E05  	jsr PUT_STR
+765.  269 120002  	ads# 2
+766.  26A 0001F4  	lda# 500
+767.  26B 180064  	mul# 100
+768.  26C 190007  	div# 7
+769.  26D 140001  ending_wa:	sba# 1
+770.  26E 200000  	cma# 0
+771.  26F 49226D  	jne ending_wa
+772.  270 FFFFFF  	hlt ;if game over
+773.  271 000004  replay:	lda# REPLAY_COUNT
+774.  272 04700C  	sta* !mdelay
+775.  273 010005  	ldx# 5
+776.              end_move:	;lda# INTERRUPT_ENA
+777.              	;outb KBD_CNTL	
+778.  274 003001  	lda !mcheck
+779.  275 690004  	fin# 4
+780.  276 FFF040  	rtn
+781.              ;START SNAKE
+782.              .equ cChar, 4
+783.              .equ Xloc, 3
+784.              .equ yloc, 2
+785.  277 680000  Put_char:	bgn# 0
+786.  278 FFF010  	psha
+787.  279 003002  	lda !Yloc
+788.  27A 140001  	sba# 1
+789.  27B 180026  	mul# 38
+790.  27C 103003  	ada !Xloc
+791.  27D FFF000  	tax
+792.  27E 003004  	lda !cChar
+793.  27F 714100  	outb+ CRT_BUFFER
+794.              	;lda !Xloc
+795.              	;outb CRT_XREG
+796.              	;lda !Yloc
+797.              	;outb CRT_YREG
+798.              	;lda !cChar
+799.              	;outb CRT_DATA
+800.  280 0003E8  	lda# 1000
+801.  281 712314  	outb CRT_XREG
+802.  282 712315  	outb CRT_YREG
+803.  283 FFF013  	popa
+804.  284 690000  	fin# 0
+805.  285 FFF040  	rtn
+806.              .equ abs_value, 2
+807.  286 680000  abs:	bgn# 0
+808.  287 003002  	lda !abs_value
+809.  288 200000  	cma# 0
+810.  289 4B228B  	jge done_abs
+811.  28A 1822AD  	mul neg_one
+812.  28B 690000  done_abs:	fin# 0
+813.  28C FFF040  	rtn
+814.              .equ set_second1, 2
+815.  28D 680000  set_second:	bgn# 0
+816.  28E FFF010  	psha
+817.  28F 003002  	lda !set_second1
+818.  290 732031  	outw TIM_RELOAD
+819.  291 FFF013  	popa
+820.  292 690000  	fin# 0
+821.  293 FFF040  	rtn
+822.              .equ set_second2, 2
+823.  294 680000  reduce_time:	bgn# 0
+824.  295 FFF010  	psha
+825.  296 722031  	inw TIM_RELOAD
+826.  297 140064  	sba# 100
+827.  298 200384  	cma# 900
+828.  299 4C229B  	jle done_add
+829.  29A 732031  	outw TIM_RELOAD
+830.  29B FFF013  done_add:	popa
+831.  29C 690000  	fin# 0
+832.  29D FFF040  	rtn
+833.  29E 002710  second: .word 10000
+834.  29F 000000  SEED: .word 0
+835.  2A0 000001  speed: .word 1
+836.  2A1 000000  score: .word 0
+837.  2A2 000041  char: .word 65
+838.  2A3 000000  DELAY: .word 0
+839.  2A4 000000  because: .word
+840.  2A5 000000  temp: .word
+841.  2A6 00004F  body_char: .word 'O'
+842.  2A7 000000  direction: .word
+843.  2A8 000000  head: .word
+844.  2A9 000000  live: .word
+845.  2AA 000000  tail: .word
+846.  2AB 00C350  count_down: .word 50000
+847.  2AC 000005  sec_count: .word 5
+848.  2AD FFFFFF  neg_one: .word -1
+849.  2AE 000001  timer_cnt: .word play_delay
+850.  2AF 537065  speed_str: .char 'Speed for demo (1 = fast, 9 = slow)', SPEED_STR_LEN
+      2B0 656420
+      2B1 666F72
+      2B2 206465
+      2B3 6D6F20
+      2B4 283120
+      2B5 3D2066
+      2B6 617374
+      2B7 2C2039
+      2B8 203D20
+      2B9 736C6F
+      2BA 772920
+851.  2BB 536565  seed_str: .char 'Seed', SEED_STR_LEN
+      2BC 642020
+852.  2BD 202020  intro1: .char '     Snake Game!!!', INTRO1_LEN
+      2BE 202053
+      2BF 6E616B
+      2C0 652047
+      2C1 616D65
+      2C2 212121
+853.  2C3 546869  intro2: .char 'This is the ASCII version of', INTRO2_LEN
+      2C4 732069
+      2C5 732074
+      2C6 686520
+      2C7 415343
+      2C8 494920
+      2C9 766572
+      2CA 73696F
+      2CB 6E206F
+      2CC 662020
+854.  2CD 736E61  intro3: .char 'snake. the game starts when the', INTRO3_LEN
+      2CE 6B652E
+      2CF 207468
+      2D0 652067
+      2D1 616D65
+      2D2 207374
+      2D3 617274
+      2D4 732077
+      2D5 68656E
+      2D6 207468
+      2D7 652020
+855.  2D8 656E74  intro4: .char 'enter key is pressed. The game', INTRO4_LEN
+      2D9 657220
+      2DA 6B6579
+      2DB 206973
+      2DC 207072
+      2DD 657373
+      2DE 65642E
+      2DF 205468
+      2E0 652067
+      2E1 616D65
+856.  2E2 656E64  intro5: .char 'ends whe either the user presses x,', INTRO5_LEN
+      2E3 732077
+      2E4 686520
+      2E5 656974
+      2E6 686572
+      2E7 207468
+      2E8 652075
+      2E9 736572
+      2EA 207072
+      2EB 657373
+      2EC 657320
+      2ED 782C20
+857.  2EE 6F7220  intro6: .char 'or their life reaches zero.', INTRO6_LEN
+      2EF 746865
+      2F0 697220
+      2F1 6C6966
+      2F2 652072
+      2F3 656163
+      2F4 686573
+      2F5 207A65
+      2F6 726F2E
+858.  2F7 417272  intro7: .char 'Arrow keys to move, spacebar to pause', INTRO7_LEN
+      2F8 6F7720
+      2F9 6B6579
+      2FA 732074
+      2FB 6F206D
+      2FC 6F7665
+      2FD 2C2073
+      2FE 706163
+      2FF 656261
+      300 722074
+      301 6F2070
+      302 617573
+      303 652020
+859.  304 457665  intro8: .char 'Every 10 foods nets an extra life, ', INTRO8_LEN
+      305 727920
+      306 313020
+      307 666F6F
+      308 647320
+      309 6E6574
+      30A 732061
+      30B 6E2065
+      30C 787472
+      30D 61206C
+      30E 696665
+      30F 2C2020
+860.  310 736E61  intro9: .char 'snake wraps around walls, and the ', INTRO9_LEN
+      311 6B6520
+      312 777261
+      313 707320
+      314 61726F
+      315 756E64
+      316 207761
+      317 6C6C73
+      318 2C2061
+      319 6E6420
+      31A 746865
+      31B 202020
+861.  31C 67616D  intro0: .char 'game gets faster as you progress.', INTRO0_LEN
+      31D 652067
+      31E 657473
+      31F 206661
+      320 737465
+      321 722061
+      322 732079
+      323 6F7520
+      324 70726F
+      325 677265
+      326 73732E
+862.  327 202020  score_print: .char '                Score: ', SCORE_PRINT_LEN
+      328 202020
+      329 202020
+      32A 202020
+      32B 202020
+      32C 205363
+      32D 6F7265
+      32E 3A2020
+863.  32F 202020  live_print: .char  '                Lives: ', LIVE_PRINT_LEN
+      330 202020
+      331 202020
+      332 202020
+      333 202020
+      334 204C69
+      335 766573
+      336 3A2020
+864.  337 202020  game_over_p: .char '                Game Over', GAME_OVER_P_LEN
+      338 202020
+      339 202020
+      33A 202020
+      33B 202020
+      33C 204761
+      33D 6D6520
+      33E 4F7665
+      33F 722020
+865.              .equ @, $a00
+866.  A00 000000  Q: .blkw Q_SIZE, 0;might be wrong
+
+                     SYMBOL TABLE CONTENTS
+
+000286 = ABS             000002 = ABS_VALUE       000204 = AFTER_SET_F     
+000187 = BACK_WAIT       0002A4 = BECAUSE         00004F = BODY            
+0002A6 = BODY_CHAR       000313 = BOTTOM_RIGHT    00009F = CASE_DOWN       
+0000AF = CASE_LEFT       0000A7 = CASE_RIGHT      000097 = CASE_UP         
+000004 = CCHAR           0002A2 = CHAR            000001 = CLEAR_DISPLAY   
+000001 = CLEAR_SCREEN    0000F4 = CMP_FOOD_FOR    0000B7 = COMPARE_SI      
+0002AB = COUNT_DOWN      000100 = CRT_BUFFER      000316 = CRT_CNTL        
+000026 = CRT_COLS        000317 = CRT_DATA        00000E = CRT_ROWS        
+000314 = CRT_XREG        000315 = CRT_YREG        0002A3 = DELAY           
+0002A7 = DIRECTION       000002 = DIR_DOWN        000004 = DIR_LEFT        
+000005 = DIR_RIGHT       000003 = DIR_UP          0001E7 = DO              
+00028B = DONE_ABS        00029B = DONE_ADD        000176 = DONE_WAIT       
+000050 = DOWN_ARROW      00002F = DOWN_KEY        00021B = DO_WHILE        
+0001BF = DSET_1          000236 = ELSE_FOOD_FLAG  0000C0 = ENABLE_AND_RESET
+0000D0 = ENABLE_RESET_AND_START00026D = ENDING_WA       0000DD = END_DO_WHILES   
+000274 = END_MOVE        0000F6 = END_START       00000D = ENTER_KEY       
+000145 = ENTER_WAIT      00000A = EXTRA_LIFE      000046 = FOOD            
+0000C4 = FOR_FOOD_Q      00008A = FOR_Q           000337 = GAME_OVER_P     
+000019 = GAME_OVER_P_LEN 000E01 = GET_NUM         0002A8 = HEAD            
+000004 = HOME            000080 = INTERRUPT_ENA   00031C = INTRO0          
+000021 = INTRO0_LEN      0002BD = INTRO1          000012 = INTRO1_LEN      
+0002C3 = INTRO2          00001C = INTRO2_LEN      0002CD = INTRO3          
+00001F = INTRO3_LEN      0002D8 = INTRO4          00001E = INTRO4_LEN      
+0002E2 = INTRO5          000023 = INTRO5_LEN      0002EE = INTRO6          
+00001B = INTRO6_LEN      0002F7 = INTRO7          000025 = INTRO7_LEN      
+000304 = INTRO8          000023 = INTRO8_LEN      000310 = INTRO9          
+000022 = INTRO9_LEN      000000 = KBD_CNTL        000001 = KBD_DATA        
+000040 = KBD_FLUSH       000000 = KBD_STAT        00004E = KEYDONE         
+000016 = KEYISR          00001D = KEY_SWITCH      00004B = LEFT_ARROW      
+000035 = LEFT_KEY        0002A9 = LIVE            00032F = LIVE_PRINT      
+000017 = LIVE_PRINT_LEN  0001D1 = LSET_1          000014 = MAINLOOP        
+00000D = MBODY_CHAR      0001E6 = MCASE_DONE      0001B3 = MCASE_DOWN      
+0001C2 = MCASE_LEFT      0001D4 = MCASE_RIGHT     0001A4 = MCASE_UP        
+000001 = MCHECK          00000C = MDELAY          000008 = MDIRECTION      
+000000 = MFOOD_FLAG      00000A = MHEAD           00000B = MLIVE           
+000004 = MLOC            000177 = MOVE            000196 = MOVE_SNAKE      
+000007 = MQ              000006 = MSCORE          000009 = MTAIL           
+000003 = MX              000002 = MY              0002AD = NEG_ONE         
+0001FD = NO_BODY         000000 = NO_OP           00024B = NO_RESET_TAIL   
+000002 = OPTION          000000 = PAUSE_DELAY     000001 = PLAY_DELAY      
+000277 = PUT_CHAR        000E08 = PUT_CHR         000E06 = PUT_NL          
+000E00 = PUT_NUM         000E07 = PUT_NUM2        000E05 = PUT_STR         
+000A00 = Q               00020E = Q_OK            000258 = Q_SIZE          
+0000FF = RANDOM          000002 = RANDOMMAX       000294 = REDUCE_TIME     
+000271 = REPLAY          000004 = REPLAY_COUNT    000040 = RESET_READY_BIT 
+00004D = RIGHT_ARROW     00003B = RIGHT_KEY       0001E3 = RSET_1          
+00000E = SBODY_CHAR      0002A1 = SCORE           000327 = SCORE_PRINT     
+000017 = SCORE_PRINT_LEN 000008 = SDELAY          00000C = SDIRECTION      
+000070 = SDONE           000067 = SDOWN           00029E = SECOND          
+0002AC = SEC_COUNT       00029F = SEED            0002BB = SEED_STR        
+000004 = SEED_STR_LEN    000202 = SET_FOOD_1      0000C2 = SET_FOOD_Q      
+0001E9 = SET_MX          00023A = SET_MX2         00028D = SET_SECOND      
+000002 = SET_SECOND1     000002 = SET_SECOND2     00000B = SHEAD           
+000000 = SI              00006D = SLEFT           000003 = SLOC            
+00024B = SNAKE_DIE       000041 = SPACE_KEY       0002A0 = SPEED           
+0002AF = SPEED_STR       000023 = SPEED_STR_LEN   000009 = SQ              
+00006A = SRIGHT          00000D = SSECOND         00000A = STAIL           
+000109 = STARTGAME       000010 = START_AFTER_LOAD0000F3 = START_ELSE      
+000050 = START_SNAKE     00016D = START_TIM_S     00014B = STOP_ENTER      
+000064 = SUP             000005 = SX              000002 = SX2             
+000004 = SY              000001 = SY2             0002AA = TAIL            
+0002A5 = TEMP            000151 = TIMERISR        0002AE = TIMER_CNT       
+000192 = TIMER_DONE      000030 = TIM_CNTL        000034 = TIM_COUNT       
+000031 = TIM_RELOAD      000030 = TIM_STAT        000049 = UN_PAUSE        
+000048 = UP_ARROW        000029 = UP_KEY          0001B0 = USET_1          
+00015B = WAITING         000002 = WAIT_DELAY      0000C7 = X2_LOOP         
+000003 = XLOC            0000D2 = Y2_LOOP         0001FA = YES_BODY        
+000002 = YLOC            

@@ -1,0 +1,535 @@
+LINE ADDR CONTENTS SOURCE LINE
+  1.                        	.EQU KBD_CNTL,  	$000
+  2.                        	.EQU KBD_STAT,  	$000
+  3.                        	.EQU KBD_DATA,  	$001
+  4.                        	.EQU KBD_FLUSH, 	$40
+  5.                        	.EQU TIM_CNTL,      	$030
+  6.                        	.EQU TIM_STAT,      	$030
+  7.                        	.EQU TIM_VALUE,     	$031
+  8.                        	.EQU TIM_COUNT,     	$034
+  9.                       
+ 10.                        	.EQU INTERRUPT_ENA,           $80
+ 11.                        	.EQU RESET_READY_BIT,         $40
+ 12.                        	.EQU START_AFTER_LOAD,        $10
+ 13.                        	.EQU ENABLE_RESET_AND_START,  $D0
+ 14.                        	.EQU ENABLE_AND_RESET,        $C0
+ 15.              
+ 16.                        	.EQU CRT_BUFFER,    	$100
+ 17.                        	.EQU BOTTOM_RIGHT,  	$313
+ 18.                        	.EQU CRT_XREG,      	$314
+ 19.              	.EQU CRT_YREG,      	$315
+ 20.                        	.EQU CRT_CNTL,      	$316
+ 21.                        	.EQU CRT_DATA,      	$317
+ 22.              	.EQU CRT_ROWS,      	$0E
+ 23.                        	.EQU CRT_COLS,      	$26
+ 24.                        	.EQU CLEAR_DISPLAY, 	$01
+ 25.              	.EQU HOME,		$04
+ 26.              
+ 27.                        	.EQU PUT_NUM,       	$E00      ; MINI_OS JSRS
+ 28.                        	.EQU GET_NUM,       	$E01
+ 29.                        	.EQU PUT_STR,       	$E05
+ 30.                        	.EQU PUT_NL,        	$E06
+ 31.                        	.EQU PUT_NUM2,      	$E07
+ 32.                        	.EQU PUT_CHR,       	$E08
+ 33.              
+ 34.                        	.EQU PADDLE_HEIGHT,	3
+ 35.                        	.EQU MAX_PADDLE_Y,	11
+ 36.                        	.EQU QUIT,		'x'
+ 37.              	.EQU VERTICLE_LINE,	'|'
+ 38.              	.EQU HORIZONTAL_LINE,	'-'
+ 39.              	.EQU BALL_CHR,	'*'
+ 40.              	.EQU NONE,		15
+ 41.              	.EQU TOP,		0
+ 42.              	.EQU BOTTOM,	13
+ 43.              	.EQU LEFT,		0
+ 44.              	.EQU RIGHT,		37
+ 45.               	.EQU LEFT_UP, 	'w'
+ 46.                        	.EQU LEFT_LEFT,	'a'
+ 47.                        	.EQU LEFT_RIGHT,	'd'
+ 48.                        	.EQU LEFT_DOWN,	's'
+ 49.                        	.EQU RIGHT_UP,	3
+ 50.                        	.EQU RIGHT_LEFT,	4
+ 51.                        	.EQU RIGHT_RIGHT,	5
+ 52.                        	.EQU RIGHT_DOWN,	2
+ 53.              	.EQU PLAY_DELAY,	1 ; # of timer iterations before ball moves
+ 54.              	.EQU WINNER_DELAY,	10; # of timer iterations while winner shown
+ 55.              
+ 56.  000 020E00    	LDS#  	$E00
+ 57.  001 FFF033    	CIE
+ 58.  002 080149  	psh#	ballX
+ 59.  003 08014A  	psh#	ballY
+ 60.  004 080147  	psh#	leftY
+ 61.  005 080148  	psh#	rightY
+ 62.  006 08014C  	psh#	deltaX
+ 63.  007 08014D  	psh#	deltaY
+ 64.  008 412072       	jsr 	startGame
+ 65.  009 120006  	ads#	6
+ 66.  00A 00009C  	LDA#	KEYISR
+ 67.  00B 042FF8          	STA 	$FF8
+ 68.  00C 0000C0        	LDA#	ENABLE_AND_RESET
+ 69.  00D 712000  	OUTB 	KBD_CNTL
+ 70.  00E 00214F            	LDA       	DELAY
+ 71.  00F 732031            	OUTW      	TIM_VALUE
+ 72.  010 0000FE      	LDA#	TIMERISR
+ 73.  011 042FFB  	STA 	$FFB		; SET-UP TIMER ISR
+ 74.  012 0000D0  	LDA#	ENABLE_RESET_AND_START
+ 75.  013 712030  	OUTB 	TIM_CNTL         
+ 76.  014 FFF032  	SIE
+ 77.  015 FFF038  MAINLOOP:	NOP
+ 78.  016 402015  	JMP	MAINLOOP
+ 79.              
+ 80.              ; void announce(int *winner)
+ 81.              	.equ	announceWinner, 2
+ 82.  017 680000  announce:	bgn#	0
+ 83.  018 FFF010  	psha
+ 84.  019 000000  	lda#	0
+ 85.  01A 042150  	sta	TIMER		; reset timer count
+ 86.  01B 00000A  	lda#	WINNER_DELAY	
+ 87.  01C 042145  	sta	TIMER_CNT		; set to 5 second wait
+ 88.  01D 000003  	lda#	3
+ 89.  01E 712314  	outb	CRT_XREG
+ 90.  01F 000006  	lda#	6	
+ 91.  020 712315  	outb	CRT_YREG
+ 92.  021 007002  	lda* !	announceWinner
+ 93.  022 200025  	cma#	RIGHT
+ 94.  023 492027  	jne	announce2
+ 95.  024 08001F  	psh#	R_WINNER_LEN
+ 96.  025 08015D  	psh#	R_WINNER
+ 97.  026 402029  	jmp	announce3
+ 98.  027 08001E  announce2:	psh#	L_WINNER_LEN
+ 99.  028 080153  	psh#	L_WINNER
+100.  029 412E05  announce3:	jsr	PUT_STR
+101.  02A 120002  	ads#	2
+102.  02B 00000F  	lda#	NONE
+103.  02C 047002  	sta* !	announceWinner
+104.  02D 000064  	lda#	100
+105.  02E 712315  	outb	CRT_YREG
+106.  02F FFF013  	popa
+107.  030 690000  	fin#	0
+108.  031 FFF040  	rtn	; announce()
+109.              
+110.              ; int	getChar(int x, int y) places crt[y][x] in accumulator
+111.              	.equ	getCharX, 4
+112.              	.equ	getCharY, 3
+113.              	.equ	getCharTemp, 0
+114.  032 680001  GetChar:	BGN#	1
+115.  033 003003  	lda !	getCharY
+116.  034 180026  	mul#	38
+117.  035 103004  	ada !	getCharX
+118.  036 100100  	ada#	CRT_BUFFER
+119.  037 043000  	sta !	getCharTemp
+120.  038 707000  	inb* !	getCharTemp
+121.  039 690001  	fin#	1
+122.  03A FFF040  	rtn	; GetChar()
+123.              
+124.              
+125.              ; void GetNewBallPosition(int *ballX, int *ballY, int *deltaX, int *deltaY)
+126.              	.EQU	newPosBallX, 6
+127.              	.equ	newPosBallY, 5
+128.              	.equ	newPosDeltaX, 4
+129.              	.equ	newPosDeltaY, 3
+130.              	.equ	newPosTemp, 0
+131.  03B 680001  NewPos:	Bgn#	1
+132.  03C FFF010  	psha
+133.  03D 007005  	lda* !	newPosBallY
+134.  03E 107003  	ada* !	newPosDeltaY
+135.  03F 047005  	sta* !	newPosBallY
+136.  040 20000D  	cma#	BOTTOM
+137.  041 4C2046  	jle	NewPos2	; if not beyond bottom
+138.  042 00000D  	lda#	BOTTOM	
+139.  043 047005  	sta* ! 	newPosBallY
+140.  044 1D7003  	neg* !	newPosDeltaY ; reverse vertical direction	
+141.  045 40204B  	jmp	NewPos3
+142.  046 200000  NewPos2:	cma#	0
+143.  047 4B204B  	jge	NewPos3	; if not above top
+144.  048 000000  	lda#	0	; put on top row
+145.  049 047005  	sta* !	newPosBallY
+146.  04A 1D7003  	neg* !	newPosDeltaY ; reverse vertical direction
+147.  04B 007006  NewPos3:	lda* !	newPosBallX
+148.  04C 107004  	ada* !	newPosDeltaX
+149.  04D 047006  	sta* !	newPosBallX
+150.  04E 200000  	cma#	0
+151.  04F 49205A  	jne	NewPos4	; if not at lefmost position
+152.  050 087006  	psh* !	newPosBallX	; heading into leftmost position
+153.  051 087005  	psh* !	newPosBallY
+154.  052 412032  	jsr	getChar
+155.  053 120002  	ads#	2
+156.  054 20007C  	cma#	'|'
+157.  055 49205A  	jne	NewPos4 ; no paddle
+158.  056 000001  	lda#	1
+159.  057 047006  	sta* !	newPosBallX; put on second column
+160.  058 1D7004  	neg* !	newPosDeltaX; reverse horizontal direction
+161.  059 402065  	jmp	NewPos5
+162.  05A 200025  NewPos4:	cma#	RIGHT
+163.  05B 492065  	jne	NewPos5 ; if not at rightmost position
+164.  05C 087006  	psh* !	newPosBallX	; heading into rightmost position
+165.  05D 087005  	psh* !	newPosBallY
+166.  05E 412032  	jsr	getChar
+167.  05F 120002  	ads#	2
+168.  060 20007C  	cma#	'|'	
+169.  061 492065  	jne	NewPos5 ; no paddle
+170.  062 000024  	lda#	RIGHT - 1
+171.  063 047006  	sta* !	newPosBallX; put on next to last column
+172.  064 1D7004  	neg* !	newPosDeltaX; reverse horizontal direction	
+173.  065 FFF013  NewPos5:	popa
+174.  066 690001  	fin#	1
+175.  067 FFF040  	rtn	; NewPos()
+176.              
+177.              
+178.              ; int random(int max) leaves result in accumulator!
+179.              	.equ	randomMax, 2
+180.              	
+181.  068 680000  random:	bgn#	0
+182.  069 00214B  	lda	SEED
+183.  06A 180ADB  	mul#	2779
+184.  06B 1007CD  	ada#	1997
+185.  06C 1A0800  	mod#	2048
+186.  06D 04214B  	sta	SEED
+187.  06E 1B3002  	inc !	randomMax
+188.  06F 1A3002  	mod !	randomMax
+189.  070 690000  	fin#	0
+190.  071 FFF040  	rtn
+191.              	
+192.              	
+193.              ; void startGame(int *ballX, int *ballY, int *LeftY, int *RightY, int *deltaX,
+194.              ;   int *deltaY)
+195.              	.equ	startBallX, 7
+196.              	.equ	startBallY, 6
+197.              	.equ	startLeftY, 5
+198.              	.equ	startRightY, 4
+199.              	.equ	startDeltaX, 3
+200.              	.equ	startDeltaY, 2
+201.  072 680000  startGame:  BGN#	0
+202.  073 FFF010  	PSHA
+203.  074 000001  	LDA#	PLAY_DELAY
+204.  075 042145  	STA	TIMER_CNT
+205.  076 000001  	LDA#	CLEAR_DISPLAY
+206.  077 712316          	OUTB	CRT_CNTL	; CLEAR SCREEN
+207.  078 000064  	lda#	100
+208.  079 712315  	outB	CRT_YREG
+209.  07A 000012  	lda#	RIGHT / 2
+210.  07B 047007  	sta* !	startBallX
+211.  07C 08000D  	psh#	BOTTOM
+212.  07D 412068  	jsr	random
+213.  07E 120001  	ads#	1
+214.  07F 047006  	sta* !	startBallY
+215.  080 080001  	psh#	1
+216.  081 412068  	jsr	random
+217.  082 180002  	mul#	2
+218.  083 FFF020  	nega
+219.  084 100001  	ada#	1
+220.  085 047003  	sta* !	startDeltaX
+221.  086 412068  	jsr	random	; reuses 1 on stack
+222.  087 120001  	ads#	1	; now get rid of 1 from stack
+223.  088 180002  	mul#	2
+224.  089 FFF020  	nega
+225.  08A 100001  	ada#	1
+226.  08B 047002  	sta* !	startDeltaY
+227.  08C 000006  	lda#	BOTTOM / 2
+228.  08D 047005  	sta* !	startLeftY
+229.  08E 047004  	sta* !	startRightY
+230.  08F 080025    	psh#	RIGHT
+231.  090 087004  	psh* !	startRightY
+232.  091 08007C  	psh#	'|'
+233.  092 4120E2  	jsr 	showPaddle
+234.  093 120003  	ads#	3
+235.  094 080000  	psh#	LEFT
+236.  095 087005  	psh* !	startLeftY
+237.  096 08007C  	psh#	'|'
+238.  097 4120E2  	jsr	showPaddle
+239.  098 120003  	ads#	3
+240.  099 FFF013  	popa
+241.  09A 690000  	fin#	0
+242.  09B FFF040  	RTN	; startGame()
+243.              
+244.              
+245.  09C FFF010  KEYISR:  	PSHA
+246.  09D 000000  	lda#	0
+247.  09E 712000  	outb	KBD_CNTL
+248.  09F 702001  	INB 	KBD_DATA
+249.  0A0 200078  	CMA#	'x'
+250.  0A1 4920A3  	JNE	KEY1
+251.  0A2 FFFFFF  	HLT		; HALT IF 'x'
+252.  0A3 20001B  KEY1:	cma#	$1B	; escape so cursor?
+253.  0A4 4920B3  	jne	key3	; jump if not escape
+254.  0A5 702001  	inb	kbd_data	; read second escaped key
+255.  0A6 200048  	cma#	$48	; if up cursor
+256.  0A7 4920AA  	jne	key2
+257.  0A8 000003  	lda#	RIGHT_UP	; set to RIGHT_UP
+258.  0A9 4020AD  	jmp	RIGHTKey
+259.  0AA 200050  KEY2:	cma#	$50	; if down cursor
+260.  0AB 4920BC  	jne	KeyDone
+261.  0AC 000002  	lda#	RIGHT_DOWN	; down cursor
+262.  0AD FFF010  RIGHTKey:	psha
+263.  0AE 080148  	psh#	RightY
+264.  0AF 080025  	psh#	RIGHT
+265.  0B0 4120C0  	jsr	movePaddle
+266.  0B1 120003  	ads#	3
+267.  0B2 4020BC  	jmp	keydone		
+268.  0B3 200077  Key3:	cma#	LEFT_UP
+269.  0B4 4820B7  	jeq	LEFTKey	; LEFT_UP key so move the paddle
+270.  0B5 200073  	cma#	LEFT_DOWN
+271.  0B6 4920BC  	jne	keydone	; not a valid key so leave	
+272.  0B7 FFF010  LEFTKey:	psha
+273.  0B8 080147  	psh#	LeftY
+274.  0B9 080000  	psh#	LEFT
+275.  0BA 4120C0  	jsr	movePaddle
+276.  0BB 120003  	ads#	3
+277.  0BC 000080  Keydone:	lda#	INTERRUPT_ENA
+278.  0BD 712000  	outb	KBD_CNTL
+279.  0BE FFF013  	POPA
+280.  0BF FFF041  	IRTN
+281.              	
+282.              ; void movePaddle(char key, int *y, int x)
+283.              	.EQU	movePaddleKey, 4
+284.              	.EQU	movePaddleY, 3
+285.              	.EQU	movePaddleX, 2 
+286.  0C0 680000  movePaddle: bgn#	0
+287.  0C1 FFF010  	psha
+288.  0C2 FFF011  	pshx
+289.  0C3 083002  	psh !	movePaddleX
+290.  0C4 087003  	psh* !	movePaddleY
+291.  0C5 080020  	psh#	' '
+292.  0C6 4120E2  	jsr	showPaddle
+293.  0C7 120003  	ads#	3
+294.  0C8 200003  	cma#	RIGHT_UP
+295.  0C9 4820CC  	jeq	paddleUp
+296.  0CA 200077  	cma#	LEFT_UP
+297.  0CB 4920D1  	jne	padNotUp
+298.  0CC 007003  paddleUp:	lda* !	movePaddleY
+299.  0CD 200000  	cma#	TOP
+300.  0CE 4C20D9  	jle	showPad	; cannot move up
+301.  0CF 1C7003  	dec* !	movePaddleY	; can move up
+302.  0D0 4020D9  	jmp	showPad
+303.  0D1 200002  padNotUp:	cma#	RIGHT_DOWN
+304.  0D2 4820D5  	jeq	padDown
+305.  0D3 200073  	cma#	LEFT_DOWN
+306.  0D4 4920D9  	jne	showPad
+307.  0D5 007003  padDown:	lda* !	movePaddleY	; either right down or left down
+308.  0D6 20000B  	cma#	MAX_PADDLE_Y
+309.  0D7 4B20D9  	jge	showPad	; already at bottom so do not inc y
+310.  0D8 1B7003  	inc* !	movePaddleY
+311.  0D9 083002  showPad:	psh !	movePaddleX
+312.  0DA 087003  	psh* !	movePaddleY
+313.  0DB 08007C  	psh#	'|'
+314.  0DC 4120E2  	jsr	showPaddle
+315.  0DD 120003  	ads#	3
+316.  0DE FFF013  	popa
+317.  0DF FFF014  	popx
+318.  0E0 690000  	fin#	0
+319.  0E1 FFF040  	rtn	; movePaddle()
+320.              
+321.              
+322.              ; void showPaddle(int x, int y, char letter)
+323.              	.EQU	showPaddleX, 4
+324.              	.EQU	showPaddleY, 3
+325.              	.EQU	showPaddleLetter, 2
+326.  0E2 680000  showPaddle: bgn# 	0
+327.  0E3 FFF010  	psha
+328.  0E4 FFF011  	pshx
+329.  0E5 010002  	ldx#	2
+330.  0E6 083004  	psh !	showPaddleX
+331.  0E7 083003  showPad1:	psh !	showPaddleY
+332.  0E8 083002  	psh !	showPaddleLetter
+333.  0E9 4120F2  	jsr	putChar
+334.  0EA 120002  	ads#	2
+335.  0EB 1B3003  	inc !	showPaddleY
+336.  0EC 6120E7  	soj	showPad1
+337.  0ED 120001  	ads#	1
+338.  0EE FFF014  	popx
+339.  0EF FFF013  	popa
+340.  0F0 690000  	fin# 	0
+341.  0F1 FFF040  	rtn	; showPaddle()
+342.              
+343.              
+344.              ; void putChar(int x, int y, char c)
+345.              	.EQU	putCharX, 5
+346.              	.EQU	putCharY, 4
+347.              	.EQU	putCharC, 3
+348.              	.EQU	putCharTemp, 0
+349.              
+350.  0F2 680001  putChar:	bgn#	1
+351.  0F3 FFF010  	psha
+352.  0F4 003004  	lda !	putCharY
+353.  0F5 180026  	mul#	38
+354.  0F6 103005  	ada !	putCharX
+355.  0F7 100100  	ada#	CRT_BUFFER
+356.  0F8 043000  	sta !	putCharTemp
+357.  0F9 003003  	lda !	putCharC
+358.  0FA 717000  	outb* !	putCharTemp
+359.  0FB FFF013  	popa
+360.  0FC 690001  	fin#	1
+361.  0FD FFF040  	rtn
+362.              
+363.  0FE FFF010  TIMERISR: 	PSHA
+364.  0FF 1B2150            	INC       	TIMER
+365.  100 002150            	lda	Timer
+366.  101 202145  	cma	TIMER_CNT
+367.  102 4A211B  	jlt	TIMER_DONE
+368.  103 20000A  	cma#	WINNER_DELAY
+369.  104 492110  	jne	Timer1
+370.  105 000001  	lda#	PLAY_DELAY	; set timer play since just announced winner
+371.  106 042145  	sta	TIMER_CNT		
+372.  107 080149  	psh#	ballX
+373.  108 08014A  	psh#	ballY
+374.  109 080147  	psh#	leftY
+375.  10A 080148  	psh#	rightY
+376.  10B 08014C  	psh#	deltaX
+377.  10C 08014D  	psh#	deltaY
+378.  10D 412072  	jsr	startGame 
+379.  10E 120006  	ads#	6	
+380.  10F 402119  	jmp	TIMER3	; game just started now
+381.  110 080146  Timer1:	psh#	Winner
+382.  111 080149  	psh#	ballX
+383.  112 08014A  	psh#	ballY
+384.  113 082147  	psh	leftY
+385.  114 082148  	psh	rightY
+386.  115 08014C  	psh#	deltaX
+387.  116 08014D  	psh#	deltaY
+388.  117 41211F  	jsr	play
+389.  118 120007  	ads#	7	
+390.  119 000000  Timer3:	lda#	0
+391.  11A 0A2150  	clr	Timer	; reset timer count
+392.  11B 0000C0  TIMER_DONE: 	LDA#      	ENABLE_AND_RESET
+393.  11C 712030            	OUTB      	TIM_CNTL
+394.  11D FFF013            	POPA
+395.  11E FFF041            	IRTN		; END OF TIMERISR
+396.              
+397.              
+398.              ; void play (int *winner, int *ballX, int *ballY, int LeftY, int RightY, int *deltaX,
+399.               ;  int *deltaY)
+400.              	.EQU	playWinner, 8
+401.              	.EQU	playBallX, 7
+402.              	.EQU	playBallY, 6
+403.              	.EQU	playLeftY, 5
+404.              	.EQU	playRightY, 4
+405.              	.EQU	playDeltaX, 3
+406.              	.EQU	playDeltaY, 2
+407.  11F 680000  play:	bgn#	0
+408.  120 FFF010  	psha
+409.  121 087007  	psh* !	playBallX
+410.  122 087006  	psh* !	playBallY
+411.  123 080020  	psh#	' '
+412.  124 4120F2  	jsr	putChar
+413.  125 120003  	ads#	3
+414.  126 083007  	psh !	playBallX
+415.  127 083006  	psh !	playBallY
+416.  128 083003  	psh !	playDeltaX
+417.  129 083002  	psh !	playDeltaY
+418.  12A 41203B  	jsr	NewPos
+419.  12B 120004  	ads#	4
+420.  12C 007007  	lda* !	playBallX
+421.  12D 200000  	cma#	0
+422.  12E 4B2135  	jge	play2	; is ball not at -1
+423.  12F 000025  	lda#	RIGHT	; ball left of left edge
+424.  130 047008  	sta* !	playWinner
+425.  131 083008  	psh  !	playWinner
+426.  132 412017  	jsr	announce
+427.  133 120001  	ads#	1
+428.  134 402142  	jmp	playDone
+429.  135 200025  play2:	cma#	RIGHT	; ball to right of right edge?
+430.  136 4C213D  	jle	play3
+431.  137 000000  	lda#	LEFT	; ball to right of right edge
+432.  138 047008  	sta* !	playWinner
+433.  139 083008  	psh !	playWinner
+434.  13A 412017  	jsr 	announce
+435.  13B 120001  	ads#	1
+436.  13C 402142  	jmp	playDone
+437.  13D 087007  play3:	psh* !	playBallX
+438.  13E 087006  	psh* !	playBallY
+439.  13F 08002A  	psh#	'*'
+440.  140 4120F2  	jsr	putChar
+441.  141 120003  	ads#	3
+442.  142 FFF013  playDone:	popa
+443.  143 690000  	fin#	0
+444.  144 FFF040  	rtn	; play()
+445.              
+446.  145 000001  TIMER_CNT:	.WORD	PLAY_DELAY
+447.              
+448.  146 00000F  WINNER:	.WORD	NONE
+449.  147 000000  LEFTY: 	.WORD	
+450.  148 000000  RIGHTY:	.WORD
+451.  149 000000  BALLX:	.WORD	
+452.  14A 000000  BALLY:	.WORD	
+453.  14B 000000  SEED:	.WORD	0
+454.  14C 000000  DELTAX:	.WORD	
+455.  14D 000000  DELTAY:	.WORD	
+456.  14E 000000  KEY:	.WORD	
+457.  14F 030D40  DELAY:    	.WORD     	200000
+458.  150 000000  TIMER:	.WORD 	0
+459.  151 FFFFFF  MINUS1:	.WORD	-1
+460.  152 FFFFFE  MINUS2:	.WORD	-2
+461.  153 546865  L_WINNER:	.CHAR	'The winner is the Left Player!', L_WINNER_LEN
+      154 207769
+      155 6E6E65
+      156 722069
+      157 732074
+      158 686520
+      159 4C6566
+      15A 742050
+      15B 6C6179
+      15C 657221
+462.  15D 546865  R_WINNER:	.CHAR	'The winner is the Right Player!', R_WINNER_LEN
+      15E 207769
+      15F 6E6E65
+      160 722069
+      161 732074
+      162 686520
+      163 526967
+      164 687420
+      165 506C61
+      166 796572
+      167 212020
+463.              
+464.              
+465.              
+466.              
+
+                     SYMBOL TABLE CONTENTS
+
+000017 = ANNOUNCE        000027 = ANNOUNCE2       000029 = ANNOUNCE3       
+000002 = ANNOUNCEWINNER  000149 = BALLX           00014A = BALLY           
+00002A = BALL_CHR        00000D = BOTTOM          000313 = BOTTOM_RIGHT    
+000001 = CLEAR_DISPLAY   000100 = CRT_BUFFER      000316 = CRT_CNTL        
+000026 = CRT_COLS        000317 = CRT_DATA        00000E = CRT_ROWS        
+000314 = CRT_XREG        000315 = CRT_YREG        00014F = DELAY           
+00014C = DELTAX          00014D = DELTAY          0000C0 = ENABLE_AND_RESET
+0000D0 = ENABLE_RESET_AND_START000032 = GETCHAR         000000 = GETCHARTEMP     
+000004 = GETCHARX        000003 = GETCHARY        000E01 = GET_NUM         
+000004 = HOME            00002D = HORIZONTAL_LINE 000080 = INTERRUPT_ENA   
+000000 = KBD_CNTL        000001 = KBD_DATA        000040 = KBD_FLUSH       
+000000 = KBD_STAT        00014E = KEY             0000A3 = KEY1            
+0000AA = KEY2            0000B3 = KEY3            0000BC = KEYDONE         
+00009C = KEYISR          000000 = LEFT            0000B7 = LEFTKEY         
+000147 = LEFTY           000073 = LEFT_DOWN       000061 = LEFT_LEFT       
+000064 = LEFT_RIGHT      000077 = LEFT_UP         000153 = L_WINNER        
+00001E = L_WINNER_LEN    000015 = MAINLOOP        00000B = MAX_PADDLE_Y    
+000151 = MINUS1          000152 = MINUS2          0000C0 = MOVEPADDLE      
+000004 = MOVEPADDLEKEY   000002 = MOVEPADDLEX     000003 = MOVEPADDLEY     
+00003B = NEWPOS          000046 = NEWPOS2         00004B = NEWPOS3         
+00005A = NEWPOS4         000065 = NEWPOS5         000006 = NEWPOSBALLX     
+000005 = NEWPOSBALLY     000004 = NEWPOSDELTAX    000003 = NEWPOSDELTAY    
+000000 = NEWPOSTEMP      00000F = NONE            0000CC = PADDLEUP        
+000003 = PADDLE_HEIGHT   0000D5 = PADDOWN         0000D1 = PADNOTUP        
+00011F = PLAY            000135 = PLAY2           00013D = PLAY3           
+000007 = PLAYBALLX       000006 = PLAYBALLY       000003 = PLAYDELTAX      
+000002 = PLAYDELTAY      000142 = PLAYDONE        000005 = PLAYLEFTY       
+000004 = PLAYRIGHTY      000008 = PLAYWINNER      000001 = PLAY_DELAY      
+0000F2 = PUTCHAR         000003 = PUTCHARC        000000 = PUTCHARTEMP     
+000005 = PUTCHARX        000004 = PUTCHARY        000E08 = PUT_CHR         
+000E06 = PUT_NL          000E00 = PUT_NUM         000E07 = PUT_NUM2        
+000E05 = PUT_STR         000078 = QUIT            000068 = RANDOM          
+000002 = RANDOMMAX       000040 = RESET_READY_BIT 000025 = RIGHT           
+0000AD = RIGHTKEY        000148 = RIGHTY          000002 = RIGHT_DOWN      
+000004 = RIGHT_LEFT      000005 = RIGHT_RIGHT     000003 = RIGHT_UP        
+00015D = R_WINNER        00001F = R_WINNER_LEN    00014B = SEED            
+0000D9 = SHOWPAD         0000E7 = SHOWPAD1        0000E2 = SHOWPADDLE      
+000002 = SHOWPADDLELETTER000004 = SHOWPADDLEX     000003 = SHOWPADDLEY     
+000007 = STARTBALLX      000006 = STARTBALLY      000003 = STARTDELTAX     
+000002 = STARTDELTAY     000072 = STARTGAME       000005 = STARTLEFTY      
+000004 = STARTRIGHTY     000010 = START_AFTER_LOAD000150 = TIMER           
+000110 = TIMER1          000119 = TIMER3          0000FE = TIMERISR        
+000145 = TIMER_CNT       00011B = TIMER_DONE      000030 = TIM_CNTL        
+000034 = TIM_COUNT       000030 = TIM_STAT        000031 = TIM_VALUE       
+000000 = TOP             00007C = VERTICLE_LINE   000146 = WINNER          
+00000A = WINNER_DELAY    

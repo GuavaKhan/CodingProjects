@@ -1,0 +1,12 @@
+english([revolution], [revolution]).
+
+english(A, B):-
+	append([counter],C,A),
+	append([anti],D,B),
+	english(C, D).
+
+english(A, B):-
+	append(C,[ary],A),
+	append([someone,that,abides,by,the], D, B),
+	english(C,D).
+

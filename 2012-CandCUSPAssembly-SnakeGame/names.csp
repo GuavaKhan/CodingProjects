@@ -1,0 +1,65 @@
+	.equ TDR_CNTL, $020
+	.equ TDR_STAT, $020
+	.equ TDR_LEN, $021
+	.equ TDR_ADDR, $022
+	.equ READ_BITS, $10
+	.equ MOUNTED_BIT, $020
+	.equ EOT_BIT, $08
+	.equ CRT_CNTL, $316
+	.equ CRT_DATA, $317
+	.equ NEXT_LINE_VALUE, $05
+	.equ PRT_CNTL, $10
+	.equ PRT_STAT, $10
+	.equ PRT_DATA, $11
+	lds# $E00
+MAIN:	inb TDR_STAT
+	jge T_OFF_LINE
+	lda# BUFFER
+	outw TDR_ADDR
+NEXT_REC:	lda# B_size
+	outb TDR_LEN
+	lda# READ_BITS
+	outb TDR_CNTL
+POLL:	inb TDR_STAT
+	jlt COMPLETE
+	and# MOUNTED_BIT
+	jeq T_OFF_LINE
+	jmp POLL
+COMPLETE:	and# EOT_BIT
+	jne POLL2
+	inb TDR_LEN
+	jeq NEW_LINE
+	sta count
+	ldx# 0
+	inb PRT_STAT
+	jge P_OFF_LINE
+POLL2:	inb PRT_STAT
+	jlt COPY_CHAR
+	and# $20
+	jeq STOP
+	jmp POLL2 
+COPY_CHAR:
+	ldc BUFFER
+	outb PRT_DATA
+	aoc count
+	jlt POLL2
+NEW_LINE:	lda# NEXT_LINE_VALUE
+	outb PRT_CNTL
+	jmp NEXT_REC
+STOP:	hlt
+
+T_OFF_LINE:	psh# TAPE_OFF_LEN
+	psh# tape_off
+	jsr $E05
+	ads# 2
+	hlt
+P_OFF_LINE:	psh# PRT_OFF_LEN
+	psh# PRT_off
+	jsr $E05
+	ads# 2
+	hlt
+.equ B_SIZE, 30
+buffer: .blkw (B_SIZE+2)/3
+count: .blkw 1
+tape_off: .char 'TAPE OFF LINE', TAPE_OFF_LEN
+PRT_OFF: .char 'PRINTER OFF LINE', PRT_OFF_LEN

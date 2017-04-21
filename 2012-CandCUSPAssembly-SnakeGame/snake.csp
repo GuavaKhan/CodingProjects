@@ -1,0 +1,866 @@
+	;CONSTANT
+	.equ NO_OP, 0
+	.equ PAUSE_DELAY, 0
+	.equ EXTRA_LIFE, 10
+	.equ REPLAY_COUNT, 4
+	.equ Q_SIZE, 600
+	.equ DIR_UP, 3
+	.equ DIR_DOWN, 2
+	.equ DIR_RIGHT, 5
+	.equ DIR_LEFT, 4
+	.equ UP_ARROW,'H'
+	.equ DOWN_ARROW,'P'
+	.equ RIGHT_ARROW,'M'
+	.equ LEFT_ARROW, 'K'
+	.equ BODY, 'O'	
+	.equ FOOD, 'F'
+	.equ WAIT_DELAY, 2
+	.equ KBD_CNTL, $000
+	.equ KBD_STAT, $000
+	.equ KBD_DATA, $001
+	.equ KBD_FLUSH, $40
+	.equ TIM_CNTL, $030
+	.equ TIM_STAT, $030
+	.equ TIM_RELOAD, $031
+	.equ TIM_COUNT, $034
+	.equ INTERRUPT_ENA, $80
+	.equ RESET_READY_BIT, $40
+	.equ START_AFTER_LOAD, $10
+	.equ ENABLE_RESET_AND_START, $D0
+	.equ ENABLE_AND_RESET, $C0
+	.equ CRT_BUFFER, $100
+	.equ BOTTOM_RIGHT, $313
+	.equ CRT_XREG, $314
+	.equ CRT_YREG, $315
+	.equ CRT_CNTL, $316
+	.equ CRT_DATA, $317
+	.equ CRT_ROWS, $0E
+	.equ CRT_COLS, $26
+	.equ CLEAR_DISPLAY, $01
+	.equ HOME, $04
+	.equ PUT_NUM, $E00
+	.equ GET_NUM, $E01
+	.equ PUT_STR, $E05
+	.equ PUT_NL, $E06
+	.equ PUT_NUM2, $E07
+	.equ PUT_CHR, $E08
+	.equ CLEAR_SCREEN, $01
+	.equ ENTER_KEY, $0D
+	.equ PLAY_DELAY, 1
+	;END CONSTANT
+	LDS# $E00
+	clr score
+	ldx# 3
+	stx live
+	lda# 1
+	sta speed
+	clr SEED
+	;PASS DELAY REMINDER
+	jsr startgame; display game screen
+	CIE
+	LDA# KEYISR 
+	STA $FF8
+	LDA# ENABLE_AND_RESET 
+	OUTB KBD_CNTL
+	LDA# 1
+	OUTW TIM_RELOAD
+	LDA# TIMERISR
+	STA $FFB ; SET-UP TIMER ISR
+	lda# ENABLE_RESET_AND_START
+	outb TIM_CNTL
+	SIE
+MAINLOOP:	NOP
+	JMP MAINLOOP
+
+	
+
+;KEYBOARD CONTROL
+KEYISR:	PSHA 
+	lda# 0
+	outb KBD_CNTL
+	INB KBD_DATA
+	CMA# 'x'
+	JNE KEY_SWITCH
+	HLT
+KEY_SWITCH:	cma# ' '
+	jeq space_key
+	inb KBD_DATA
+	cma# UP_ARROW
+	jeq up_key
+	cma# DOWN_ARROW
+	jeq down_key
+	cma# LEFT_ARROW
+	jeq left_key
+	cma# RIGHT_ARROW
+	jeq right_key
+	jmp Keydone
+up_key:	lda direction
+	cma# DIR_DOWN
+	jeq Keydone
+	lda# DIR_UP
+	sta direction
+	jmp Keydone
+down_key:	lda direction
+	cma# DIR_UP
+	jeq Keydone
+	lda# DIR_DOWN
+	sta direction
+	jmp Keydone
+left_key:	lda direction
+	cma# DIR_RIGHT
+	jeq Keydone
+	lda# DIR_LEFT
+	sta direction
+	jmp Keydone
+right_key:	lda direction
+	cma# DIR_LEFT
+	jeq Keydone
+	lda# DIR_RIGHT
+	sta direction
+	jmp Keydone
+space_key:	lda delay
+	cma# PAUSE_DELAY
+	jeq un_pause
+	lda# PAUSE_DELAY
+	sta delay
+	lda# INTERRUPT_ENA
+	outb KBD_CNTL
+	jmp Keydone
+un_pause:	lda# PLAY_DELAY
+	sta delay
+	lda# INTERRUPT_ENA
+	outb KBD_CNTL
+	jmp Keydone
+Keydone:	;lda# INTERRUPT_ENA
+	;outb KBD_CNTL	
+	;lda# KBD_FLUSH
+	;outb KBD_CNTL
+	popa
+	IRTN
+	
+
+;END OF KEYBOARD
+.equ sbody_char, 14
+.equ ssecond, 13
+.equ sdirection, 12
+.equ shead, 11
+.equ stail, 10
+.equ sQ, 9
+.equ sdelay, 8
+.equ sx, 5
+.equ sy, 4
+.equ sloc, 3
+.equ sx2, 2
+.equ sy2, 1
+.equ si, 0
+start_snake:	bgn# 6
+	psha
+	pshx
+	lda# CLEAR_SCREEN
+	outb CRT_CNTL
+	lda# 1;change lnegth
+	sta !si
+	psh# 3
+	jsr random
+	ads# 1
+	ada# DIR_DOWN
+	sta* !sdirection
+	cma# DIR_UP
+	jeq sup
+	cma# DIR_DOWN
+	jeq sdown
+	cma# DIR_RIGHT
+	jeq sright
+	cma# DIR_LEFT
+	jeq sleft
+sup:	lda# '^'
+	sta !sbody_char
+	jmp sdone
+sdown:	lda# 'v'
+	sta !sbody_char
+	jmp sdone
+sright:	lda# '>'
+	sta !sbody_char
+	jmp sdone
+sleft:	lda# '<'
+	sta !sbody_char
+	jmp sdone
+sdone:
+	psh# 28
+	jsr random
+	ads# 1
+	ada# 5
+	sta !sx ;so it start 5 from wall
+	psh# 4
+	jsr random
+	ads# 1
+	ada# 5
+	;sba# 1;added
+	sta !sy ;so it start 5 from wall
+	lda !sy
+	mul# 38
+	ada !sx
+	sta !sloc
+	psh !sbody_char
+	psh !sx
+	psh !sy
+	jsr Put_char
+	ads# 3
+	lda# 2;change length
+	sta* !shead
+	lda# 0
+	sta* !stail
+	ldx# 2;change length
+	lda !sloc
+	sta& !sQ 
+for_Q:	lda !si
+	cma# 0
+	jlt set_food_q
+	tax
+	lda* !sdirection
+	cma# DIR_UP
+	jeq case_up
+	cma# DIR_DOWN
+	jeq case_down
+	cma# DIR_LEFT
+	jeq case_left
+	cma# DIR_RIGHT
+	jeq case_right
+case_up:	lda# '^'
+	sta !sbody_char
+	adx# 1
+	lda& !sQ
+	ada# 38
+	sbx# 1
+	sta& !sQ
+	jmp compare_si
+case_down:	lda# 'v'
+	sta !sbody_char
+	adx# 1
+	lda& !sQ
+	sba# 38
+	sbx# 1
+	sta& !sQ
+	jmp compare_si
+case_right:	lda# '>'
+	sta !sbody_char
+	adx# 1
+	lda& !sQ
+	sba# 1
+	sbx# 1
+	sta& !sQ
+	jmp compare_si
+case_left:	lda# '<'
+	sta !sbody_char
+	adx# 1
+	lda& !sQ
+	ada# 1
+	sbx# 1
+	sta& !sQ
+	jmp compare_si
+compare_si:	psh !sbody_char
+	lda& !sQ
+	mod# 38
+	psha
+	lda& !sQ
+	div# 38
+	psha
+	jsr Put_char
+	ads# 3
+	dec !si
+	jmp for_Q
+set_food_q:	lda# 0
+	sta !si
+for_food_q:	lda !si
+	cma# 5;HERE
+	jge end_start
+X2_loop:	psh# 37
+	jsr random
+	ads# 1
+	ada# 1
+	sta !sx2
+	sba !sx
+	psha
+	jsr abs
+	ads# 1
+	cma# 5
+	jlt X2_loop
+Y2_loop:	psh# 12
+	jsr random
+	ads# 1
+	ada# 1
+	;sba# 1;added
+	sta !sy2
+	sba !sy
+	psha
+	jsr abs
+	ads# 1
+	cma# 5
+	jlt Y2_loop
+end_do_whiles:
+	;lda !sy2
+	;outb CRT_YREG
+	;lda !sx2
+	;outb CRT_XREG
+	;inb CRT_DATA
+	lda !sy2
+	sba# 1
+	mul# 38
+	ada !sx2
+	;sba# 1
+	tax
+	inb+ CRT_BUFFER
+	cma# 'F'
+	jeq start_else
+	cma# '^';WRONG DOES NOT REALLY CHECK FIXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+	jeq start_else
+	cma# 'v'
+	jeq start_else
+	cma# '>'
+	jeq start_else
+	cma# '<'
+	jeq start_else
+	psh# FOOD
+	psh !sx2
+	psh !sy2
+	jsr Put_char
+	ads# 3
+	jmp cmp_food_for
+start_else:	dec !si
+cmp_food_for:	inc !si
+	jmp for_food_q
+	
+end_start:	lda* !ssecond
+	sba# 2000
+	;sba# 4000
+	;mul SPEED
+	outw TIM_RELOAD
+	;sta* !ssecond
+	lda# PLAY_DELAY
+	sta* !sdelay
+	popx
+	popa
+	fin#6
+	rtn
+	
+	.equ randomMax, 2
+random: 	bgn# 0 
+	lda SEED
+	mul# 2779
+	ada# 1997
+	mod# 2048
+	sta SEED
+	inc ! randomMax
+	mod ! randomMax
+	fin# 0
+	rtn
+;DISPLAY THE MENU OF THE PROGRAM
+startgame:	bgn# 0
+	;psh# SPEED_STR_LEN
+	;psh# speed_str
+	;jsr PUT_STR
+	;jsr GET_NUM
+	;sta speed
+	;ads# 2
+	psh# SEED_STR_LEN
+	psh# seed_str
+	jsr PUT_STR
+	jsr GET_NUM
+	sta SEED
+	ads# 2
+	lda# CLEAR_SCREEN
+	outb CRT_CNTL
+	psh# INTRO1_LEN
+	psh# intro1
+	jsr PUT_STR
+	ads# 2
+	jsr PUT_NL
+	jsr PUT_NL
+	psh# INTRO2_LEN
+	psh# intro2
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO3_len
+	psh# intro3
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO4_LEN
+	psh# intro4
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO5_LEN
+	psh# intro5
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO6_LEN
+	psh# intro6
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO7_LEN
+	psh# intro7
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO8_LEN
+	psh# intro8
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO9_LEN
+	psh# intro9
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+	psh# INTRO0_LEN
+	psh# intro0
+	jsr PUT_STR
+	jsr PUT_NL
+	ads# 2
+enter_wait:	inb KBD_STAT
+	jge enter_wait
+	inb KBD_DATA
+	cma# ENTER_KEY
+	jeq stop_enter
+	jmp enter_wait
+stop_enter:	lda# CLEAR_SCREEN
+	outb CRT_CNTL
+	lda# WAIT_DELAY
+	sta delay	
+	fin# 0
+	rtn
+;END OF MENU
+	.equ option , 2
+TIMERISR:	PSHA
+	lda DELAY
+	cma# NO_OP
+	jeq TIMER_DONE
+	cma# PLAY_DELAY
+	jeq move
+	cma# WAIT_DELAY
+	jeq waiting
+	cma# REPLAY_COUNT
+	jeq back_wait
+waiting:	psh second
+	jsr set_second
+	ads# 1
+	outb CRT_CNTL
+	lda# 7
+	outb CRT_YREG
+	lda# 19
+	outb CRT_XREG
+	txa
+	ada# 48
+	outb CRT_DATA
+	lda# 15
+	outb CRT_YREG
+	lda# 40
+	outb CRT_XREG
+	sbx# 1
+	cmx# $FFF
+	jne done_wait
+	;clr score ; set score to zero and start snake
+start_tim_s:	psh body_char
+	psh# second
+	psh# direction
+	psh# head
+	psh# tail
+	psh# Q
+	psh# DELAY
+	jsr start_snake
+	ads# 7
+done_wait:	jmp TIMER_DONE
+move:	lda# INTERRUPT_ENA
+	outb KBD_CNTL	
+	psh body_char
+	psh# delay
+	psh# live
+	psh# head
+	psh# tail
+	psh direction
+	psh# Q
+	psh# score
+	jsr move_snake	
+	ads# 8
+	psh# second
+	jsr reduce_time
+	ads# 1
+	jmp TIMER_DONE
+back_wait:	psh second
+	jsr set_second
+	ads# 1
+	sbx# 1
+	cmx# $FFF
+	jne done_wait
+	ldx# 3
+	lda# WAIT_DELAY
+	sta delay
+	lda# clear_screen
+	outb CRT_CNTL
+TIMER_DONE:	lda# ENABLE_AND_RESET
+	outb TIM_CNTL
+	popa
+	IRTN
+
+;MOVE SNAKE
+.equ mbody_char, 13
+.equ mdelay, 12
+.equ mlive, 11
+.equ mhead, 10
+.equ mtail, 9
+.equ mdirection, 8
+.equ mQ, 7
+.equ mscore, 6
+.equ mloc, 4
+.equ mx, 3
+.equ my, 2
+.equ mcheck, 1
+.equ mfood_flag, 0
+move_snake:	bgn# 4
+	;lda# INTERRUPT_ENA
+	;outb KBD_CNTL	
+	lda* !mhead
+	tax
+	lda& !mQ
+	sta !mloc
+	lda !mdirection
+	cma# DIR_UP
+	jeq mcase_up
+	cma# DIR_DOWN
+	jeq mcase_down
+	cma# DIR_LEFT
+	jeq mcase_left
+	cma# DIR_RIGHT
+	jeq mcase_right
+mcase_up:	lda# '^'
+	sta !mbody_char
+	lda !mloc
+	sba# 38
+	sta !mloc
+	lda !mloc
+	cma# 38
+	jge uset_1
+	;lda# 0
+	ada# 532
+	sta !mloc
+	sta !mcheck
+	jmp mcase_done
+uset_1:	lda# 1
+	sta !mcheck
+	jmp mcase_done
+mcase_down:	lda# 'v'
+	sta !mbody_char
+	lda !mloc
+	ada# 38
+	sta !mloc
+	lda !mloc
+	cma# 569
+	jle dset_1
+	;lda# 0
+	sba# 532
+	sta !mloc
+	sta !mcheck
+	jmp mcase_done
+dset_1:	lda# 1
+	sta !mcheck
+	jmp mcase_done
+mcase_left:	lda# '<'
+	sta !mbody_char
+	lda !mloc
+	sba# 1
+	sta !mloc
+	lda !mloc
+	ada# 1
+	mod# 38
+	cma# 0
+	jne lset_1
+	lda !mloc
+	ada# 38
+	sta !mloc
+	sta !mcheck
+	jmp mcase_done
+lset_1:	lda# 1
+	sta !mcheck
+	jmp mcase_done
+mcase_right:	lda# '>'
+	sta !mbody_char
+	lda !mloc
+	ada# 1
+	sta !mloc
+	lda !mloc
+	sba# 1
+	mod# 38
+	cma# 37
+	jne rset_1
+	lda !mloc
+	sba# 38
+	sta !mloc
+	;lda# 1
+	sta !mcheck
+	jmp mcase_done
+rset_1:	lda# 1
+	sta !mcheck
+	jmp mcase_done
+mcase_done:	lda !mcheck
+	;cma# 0
+	;jeq snake_die
+do:	lda !mloc
+	mod# 38
+	;cma# 0
+	;jne set_mx
+	;lda# 38
+set_mx:	sta !mx
+	lda !mloc
+	div# 38
+	sta !my
+	lda !mloc
+	tax
+	sbx# 38
+	;sbx# 1
+	inb+ CRT_BUFFER
+	;cma# BODY
+	cma# '^'
+	jeq yes_body
+	cma# 'v'
+	jeq yes_body
+	cma# '>'
+	jeq yes_body
+	cma# '<'
+	jeq yes_body
+	jmp no_body
+yes_body:	lda# 0
+	sta !mcheck
+	jmp snake_die
+no_body:	cma# FOOD
+	jeq set_food_1
+	lda# 0
+	sta !mfood_flag
+	jmp after_set_f
+set_food_1:	lda# 1
+	sta !mfood_flag
+after_set_f:	psh !mbody_char
+	psh !mx
+	psh !my
+	jsr Put_char
+	ads# 3
+	inc* !mhead
+	lda* !mhead
+	cma# Q_SIZE
+	jlt Q_OK
+	clr* !mhead
+Q_OK:	lda* !mhead
+	tax
+	lda !mloc
+	sta& !mQ
+	lda !mfood_flag
+	cma# 0
+	jeq else_food_flag
+	inc* !mscore
+;ADD LIFE
+	lda* !mscore
+	mod# EXTRA_LIFE
+	cma# 0
+	jne do_while
+	inc* !mlive
+do_while:	;psh# 37
+	;jsr random
+	;ads# 1
+	;sta !mx
+	;psh# 13
+	;jsr random
+	;ads# 1
+	;sta !my
+	;lda !my
+	;mul# 38
+	;ada !mx
+	psh# 531
+	jsr random
+	ads# 1
+	tax
+	div# 38
+	ada# 1
+	sta !my
+	txa
+	mod# 38
+	sta !mx
+	;sbx# 39
+	inb+ CRT_BUFFER
+	cma# '^'
+	jeq do_while
+	cma# '>'
+	jeq do_while
+	cma# '<'
+	jeq do_while
+	cma# 'v'
+	jeq do_while
+	cma# FOOD
+	jeq do_while
+;END DO WHILE
+	psh# FOOD
+	psh !mx
+	psh !my
+	jsr Put_char
+	ads# 3
+	jmp end_move
+else_food_flag:
+	lda* !mtail
+	tax
+	lda& !mQ
+	mod# 38
+	;cma# 0
+	;jne set_mx2
+	;lda# 38
+set_mx2:	sta !mx
+	lda* !mtail
+	tax
+	lda& !mQ
+	div# 38
+	sta !my
+	psh# ' '
+	psh !mx
+	psh !my
+	jsr Put_char
+	ads# 3
+	inc* !mtail
+	lda* !mtail
+	cma# Q_size
+	jlt end_move
+	clr* !mtail
+	jmp end_move
+no_reset_tail:	
+snake_die:	dec* !mlive	
+	lda# 1
+	outb CRT_XREG
+	outb CRT_YREG
+	psh# SCORE_PRINT_LEN
+	psh# SCORE_PRINT
+	jsr PUT_STR
+	ads# 2
+	lda* !mscore
+	jsr PUT_NUM2
+	lda# 2
+	outb CRT_YREG
+	lda# 1
+	outb CRT_XREG
+	psh# LIVE_PRINT_LEN
+	psh# LIVE_PRINT
+	jsr PUT_STR
+	ads# 2
+	lda* !mlive
+	jsr PUT_NUM2
+	lda* !mlive
+	cma# 0
+	jne replay
+	lda# 3
+	outb CRT_YREG
+	lda# 1
+	outb CRT_XREG
+	psh# GAME_OVER_P_LEN
+	psh# GAME_OVER_P
+	jsr PUT_STR
+	ads# 2
+	lda# 500
+	mul# 100
+	div# 7
+ending_wa:	sba# 1
+	cma# 0
+	jne ending_wa
+	hlt ;if game over
+replay:	lda# REPLAY_COUNT
+	sta* !mdelay
+	ldx# 5
+end_move:	;lda# INTERRUPT_ENA
+	;outb KBD_CNTL	
+	lda !mcheck
+	fin# 4
+	rtn
+;START SNAKE
+.equ cChar, 4
+.equ Xloc, 3
+.equ yloc, 2
+Put_char:	bgn# 0
+	psha
+	lda !Yloc
+	sba# 1
+	mul# 38
+	ada !Xloc
+	tax
+	lda !cChar
+	outb+ CRT_BUFFER
+	;lda !Xloc
+	;outb CRT_XREG
+	;lda !Yloc
+	;outb CRT_YREG
+	;lda !cChar
+	;outb CRT_DATA
+	lda# 1000
+	outb CRT_XREG
+	outb CRT_YREG
+	popa
+	fin# 0
+	rtn
+.equ abs_value, 2
+abs:	bgn# 0
+	lda !abs_value
+	cma# 0
+	jge done_abs
+	mul neg_one
+done_abs:	fin# 0
+	rtn
+.equ set_second1, 2
+set_second:	bgn# 0
+	psha
+	lda !set_second1
+	outw TIM_RELOAD
+	popa
+	fin# 0
+	rtn
+.equ set_second2, 2
+reduce_time:	bgn# 0
+	psha
+	inw TIM_RELOAD
+	sba# 100
+	cma# 900
+	jle done_add
+	outw TIM_RELOAD
+done_add:	popa
+	fin# 0
+	rtn
+second: .word 10000
+SEED: .word 0
+speed: .word 1
+score: .word 0
+char: .word 65
+DELAY: .word 0
+because: .word
+temp: .word
+body_char: .word 'O'
+direction: .word
+head: .word
+live: .word
+tail: .word
+count_down: .word 50000
+sec_count: .word 5
+neg_one: .word -1
+timer_cnt: .word play_delay
+speed_str: .char 'Speed for demo (1 = fast, 9 = slow)', SPEED_STR_LEN
+seed_str: .char 'Seed', SEED_STR_LEN
+intro1: .char '     Snake Game!!!', INTRO1_LEN
+intro2: .char 'This is the ASCII version of', INTRO2_LEN
+intro3: .char 'snake. the game starts when the', INTRO3_LEN
+intro4: .char 'enter key is pressed. The game', INTRO4_LEN
+intro5: .char 'ends whe either the user presses x,', INTRO5_LEN
+intro6: .char 'or their life reaches zero.', INTRO6_LEN
+intro7: .char 'Arrow keys to move, spacebar to pause', INTRO7_LEN
+intro8: .char 'Every 10 foods nets an extra life, ', INTRO8_LEN
+intro9: .char 'snake wraps around walls, and the ', INTRO9_LEN
+intro0: .char 'game gets faster as you progress.', INTRO0_LEN
+score_print: .char '                Score: ', SCORE_PRINT_LEN
+live_print: .char  '                Lives: ', LIVE_PRINT_LEN
+game_over_p: .char '                Game Over', GAME_OVER_P_LEN
+.equ @, $a00
+Q: .blkw Q_SIZE, 0;might be wrong

@@ -1,0 +1,12 @@
+dutch([b,e,e,n], [noun, singular], [bone]).
+dutch([b,e,r,g], [noun, singular], [mountain]).
+dutch([s,t,e,e,n], [noun, singular], [rock]).
+dutch([d,i,e,r], [noun, singular], [animal]).
+
+dutch(W, [noun, collective], ME):-
+	dutch(B, [noun, singular], D),
+	append([g,e],B, C),
+	append(C, [t,e], W),
+	append([collectivity, of], D, ME).
+	
+

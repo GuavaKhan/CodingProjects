@@ -1,0 +1,38 @@
+japanese([k,a,k], [verb, stem, reg], [write]).
+japanese([d,a,m,a,r], [verb, stem, reg], [quiet]).
+japanese([t,o,b], [verb, stem, reg], [fly]).
+japanese([t,a,b,e], [verb, stem, ru], [eat]). %no vowel change. masu,ru,nai appended
+japanese([n,o,m], [verb, stem, reg], [drink]). 
+japanese([k,a], [verb, stem, u], [buy]). %negative gets wanai instead of anai
+japanese([i,k], [verb, stem, reg], [go]).
+
+japanese(SO, [verb, polite, positive, present/future], ME):-
+	japanese(A, [verb, stem, Type], ME),
+	Type \= ru,
+	append(A, [i,m,a,s,u], SO)
+	;
+	japanese(A, [verb, stem, ru], ME),
+	append(A, [m,a,s,u], SO).
+
+japanese(SO, [verb, plain, positive, present/future], ME):-
+	japanese(A, [verb, stem, Type], ME),
+	Type \= ru,
+	append(A, [u], SO)
+	;
+	japanese(A, [verb, stem, ru], ME),
+	append(A, [r,u], SO).
+	
+
+japanese(SO, [verb, plain, negative, present/future], ME):-
+	japanese(A, [verb, stem, reg], B),
+	append(A, [a,n,a,i], SO),
+	append([not], B, ME)
+	;
+	japanese(A, [verb,stem,u], B),
+	append(A, [w,a,n,a,i], SO),
+	append([not], B, ME)
+	;
+	japanese(A, [verb,stem,ru], B),
+	append(A, [n,a,i], SO),
+	append([not], B, ME).
+
