@@ -25,6 +25,15 @@ public class TextEditorPKT extends JFrame {
             SaveAs.setEnabled(true);
         }
     };
+    Action New = new AbstractAction("New", new ImageIcon(this.getClass().getResource("new.png"))) {
+        public void actionPerformed(ActionEvent e) {
+            saveOld();
+            if(JOptionPane.showConfirmDialog(TextEditorPKT.this, "Open a New File", "New File", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION){
+                newText();
+            }
+            SaveAs.setEnabled(true);
+        }
+    };
     Action Open = new AbstractAction("Open", new ImageIcon(this.getClass().getResource("open.gif"))) {
         public void actionPerformed(ActionEvent e) {
             saveOld();
@@ -62,9 +71,23 @@ public class TextEditorPKT extends JFrame {
 
     public TextEditorPKT(){
         area.setFont(new Font("Monospaced", Font.PLAIN, 12));
+
         JScrollPane scroll = new JScrollPane(area, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
         add(scroll,BorderLayout.CENTER);
+        createToolbars();
 
+        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        pack();
+        area.addKeyListener(k1);
+        setTitle(currentFile);
+        setVisible(true);
+    }
+
+    public static void main(String[] args){
+        new TextEditorPKT();
+    }
+
+    private void createToolbars(){
         JMenuBar menuBar = new JMenuBar();
         setJMenuBar(menuBar);
         JMenu file = new JMenu("File");
@@ -72,17 +95,19 @@ public class TextEditorPKT extends JFrame {
         menuBar.add(file);
         menuBar.add(edit);
 
-
-        //file.add(New);
+        file.add(New);
         file.add(Open);
         file.add(Save);
         file.add(SaveAs);
         file.add(Quit);
         file.addSeparator();
 
-        for(int i = 0; i < 4; i++){
-            file.getItem(i).setIcon(null);
-        }
+        file.getItem(0).setIcon(new ImageIcon(this.getClass().getResource("new.png")));
+        file.getItem(1).setIcon(new ImageIcon(this.getClass().getResource("open.gif")));
+        file.getItem(2).setIcon(new ImageIcon(this.getClass().getResource("save.gif")));
+        file.getItem(3).setIcon(new ImageIcon(this.getClass().getResource("saveas.png")));
+        file.getItem(4).setIcon(new ImageIcon(this.getClass().getResource("quit.png")));
+
         edit.add(Cut);
         edit.add(Copy);
         edit.add(Paste);
@@ -92,7 +117,7 @@ public class TextEditorPKT extends JFrame {
 
         JToolBar toolbar = new JToolBar();
         add(toolbar, BorderLayout.NORTH);
-        //toolbar.add(New);
+        toolbar.add(New);
         toolbar.add(Open);
         toolbar.add(Save);
         toolbar.addSeparator();
@@ -111,15 +136,6 @@ public class TextEditorPKT extends JFrame {
         Save.setEnabled(false);
         SaveAs.setEnabled(false);
 
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        pack();
-        area.addKeyListener(k1);
-        setTitle(currentFile);
-        setVisible(true);
-    }
-
-    public static void main(String[] args){
-        new TextEditorPKT();
     }
 
     private void saveFileAs(){
@@ -165,5 +181,9 @@ public class TextEditorPKT extends JFrame {
         catch (IOException e){
 
         }
+    }
+
+    private void newText(){
+        area.setText(null);
     }
 }
